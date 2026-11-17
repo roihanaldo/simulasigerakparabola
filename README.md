@@ -8,22 +8,18 @@ Simulasi ini dikemas dengan estetika cerah bertema petualangan kartun (terinspir
 
 ## 🌟 Fitur Utama
 
-### 1. 🎛 Kontrol Parameter Interaktif
-* **Kecepatan Awal ($v_0$):** Rentang $10 - 100\text{ m/s}$.
-* **Sudut Elevasi ($\theta$):** Rentang $0^\circ - 90^\circ$.
-* **Ketinggian Awal ($h_0$):** Rentang $0 - 50\text{ meter}$ (simulasi peluncuran dari atas tebing/platform).
-* **Percepatan Gravitasi ($g$):** Rentang $1.0 - 20.0\text{ m/s}^2$ (default Bumi $9.8\text{ m/s}^2$).
-* **Preset Cepat:**
-  * **Sudut:** $0^\circ$ (datar), $30^\circ$, $45^\circ$ (maksimum di tanah datar), $60^\circ$.
-  * **Tinggi:** $0\text{ m}$ (tanah), $10\text{ m}$, $25\text{ m}$, $40\text{ m}$ (tebing).
-  * **Gravitasi Planet:** 🌍 Bumi ($9.8\text{ m/s}^2$), 🌕 Bulan ($1.62\text{ m/s}^2$), 🔴 Mars ($3.71\text{ m/s}^2$), 🪐 Yupiter ($20.0\text{ m/s}^2$).
+### 1. 🎛 Kontrol Parameter Interaktif (Slider Presisi)
+* **Kecepatan Awal ($v_0$):** Mengatur kelajuan lontaran peluru ($10 - 100\text{ m/s}$).
+* **Sudut Elevasi ($\theta$):** Mengatur kemiringan sudut penembakan ($0^\circ - 90^\circ$).
+* **Ketinggian Awal ($h_0$):** Mengatur tinggi peluncur dari atas tanah ($0 - 50\text{ meter}$) untuk mensimulasikan tembakan dari atas tebing/platform.
+* **Percepatan Gravitasi ($g$):** Mengatur kuat medan gravitasi ($1.0 - 20.0\text{ m/s}^2$).
 
 ### 2. 🎯 Kontrol Drag Langsung (Direct Manipulation)
-* **Putar Laras Meriam:** Klik dan tarik (drag) moncong meriam secara langsung menggunakan kursor mouse untuk mengatur sudut tembakan secara bebas.
-* **Tarik Platform/Menara:** Klik dan geser dudukan tebing ke atas/bawah untuk mengubah ketinggian awal ($h_0$).
+* **Putar Laras Meriam:** Klik dan seret (drag) moncong meriam secara langsung menggunakan mouse untuk mengarahkan sudut elevasi secara bebas.
+* **Tarik Platform/Tebing:** Klik dan geser dudukan tebing ke atas atau ke bawah untuk mengubah ketinggian awal ($h_0$) secara instan.
 
 ### 3. 🔍 Inspeksi Titik Lintasan (Interactive Trajectory Inspector)
-* Di sepanjang kurva lintasan, terdapat **titik-titik sampel kuning** yang dicatat setiap selang waktu.
+* Di sepanjang kurva lintasan, terdapat **titik-titik sampel kuning** yang dicatat setiap selang waktu $\approx 0.12\text{ detik}$.
 * **Klik sembarang titik** untuk membuka **kartu dialog telemetri detail**:
   * Waktu tempuh saat di titik tersebut ($t$).
   * Posisi koordinat horizontal ($x$) dan vertikal ($y$).
@@ -31,11 +27,11 @@ Simulasi ini dikemas dengan estetika cerah bertema petualangan kartun (terinspir
   * Resultan kecepatan ($v$) serta sudut arah vektor geraknya ($\alpha$).
   * Visualisasi mini vektor kecepatan langsung pada titik yang dipilih.
 
-### 4. 🐷 Mode Tantangan (Angry Birds Challenge)
-* Sasaran karakter babi hijau berdiri di atas menara kayu pada koordinat $(X_{\text{target}}, Y_{\text{target}})$.
+### 4. 🐷 Mode Tantangan Sasaran (Target Challenge)
+* Karakter babi sasaran berdiri di atas menara kayu pada koordinat $(X_{\text{target}}, Y_{\text{target}})$.
 * Pemain ditantang memperhitungkan kecepatan, sudut, dan ketinggian yang tepat untuk mengenai target.
-* Tembakan tepat sasaran memicu ledakan konfeti, bintang animasi, dan pertambahan skor.
-* Tombol **"🎯 TARGET BARU"** mengacak posisi jarak dan ketinggian sasaran untuk variasi latihan tanpa batas.
+* Tembakan tepat sasaran memicu ledakan konfeti, bintang animasi, dan penambahan skor (`+100 PTS`).
+* Tombol **"🎯 TARGET BARU"** mengacak posisi jarak dan ketinggian sasaran untuk tantangan tanpa batas.
 
 ### 5. 🏹 Visualisasi Vektor Real-time
 * **$v_x$ (Biru Cerah):** Gerak Lurus Beraturan (GLB), nilainya selalu konstan.
@@ -72,13 +68,9 @@ Gerak parabola tanpa hambatan udara merupakan perpaduan dua gerak yang saling be
 
 ## 🚀 Cara Menjalankan Simulasi
 
-### Opsi 1: Buka Langsung di Browser
-1. Clone repositori ini atau download file ZIP-nya:
-   ```bash
-   git clone https://github.com/roihanaldo-commits/simulasigerakparabola.git
-   ```
-2. Buka file `index.html` langsung di browser favorit Anda (Google Chrome, Mozilla Firefox, Microsoft Edge, dll).
-3. Tidak memerlukan server lokal atau instalasi Node.js (100% mandiri / self-contained).
+### Opsi 1: Buka Langsung di Browser (Offline)
+1. Buka file `index.html` langsung di browser Anda (Google Chrome, Microsoft Edge, Firefox, dll).
+2. Tidak memerlukan server lokal atau instalasi Node.js (100% mandiri / self-contained).
 
 ### Opsi 2: Menggunakan p5.js Web Editor
 1. Kunjungi **[https://editor.p5js.org/](https://editor.p5js.org/)**.

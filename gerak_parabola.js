@@ -1,101 +1,132 @@
 /**
- * ============================================================================
+ * =========================================================================================
  * SIMULASI FISIKA INTERAKTIF: GERAK PARABOLA (PROJECTILE MOTION)
- * EDISI KHUSUS: TEMA CERAH "ANGRY BIRDS" + MODE TANTANGAN (CHALLENGE)
- * + INSPEKSI KLIK TITIK LINTASAN (TRAJECTORY POINT INSPECTOR)
- * ============================================================================
- * Dibuat untuk p5.js & p5.js Web Editor (https://editor.p5js.org)
+ * EDISI: TEMA CERAH "ANGRY BIRDS" + MODE TANTANGAN SASARAN + INSPEKSI KLIK TITIK LINTASAN
+ * =========================================================================================
+ * Pustaka : p5.js (https://p5js.org/)
+ * Kompatibel : Browser Lokal (HTML5) & p5.js Web Editor (https://editor.p5js.org/)
  * 
- * Fitur Spesial:
- * 1. Visual Kartun Cerah & Ceria (Langit Biru, Bukit Hijau, Awan, Rumput & Tanah).
- * 2. Meriam / Peluncur Kayu Interaktif (Bisa ditarik langsung untuk atur sudut & tinggi).
- * 3. Mode Tantangan Berhadiah Target (Karakter Sasaran di atas Menara Kayu).
- * 4. Inspeksi Titik Lintasan: Setiap titik lingkaran di lintasan DAPAT DIKLIK untuk
- *    menampilkan kartu telemetri detail (t, x, y, vx, vy, v, arah vektor).
- * 5. Partikel Konfeti & Bintang saat target berhasil dihancurkan!
- * ============================================================================
+ * =========================================================================================
+ * 📖 TEORI & KONSEP FISIKA GERAK PARABOLA (KASUS IDEAL TANPA GESEKAN UDARA)
+ * =========================================================================================
+ * Gerak parabola merupakan perpaduan dua gerak lurus yang saling tegak lurus dan independen:
+ * 
+ * 1. SUMBU HORIZONTAL (X) -> Gerak Lurus Beraturan (GLB):
+ *    - Tidak ada gaya horizontal yang bekerja (ax = 0).
+ *    - Komponen kecepatan horizontal selalu bernilai konstan:
+ *        vx(t) = v0 * cos(theta) = konstan
+ *    - Posisi horizontal proyektil pada setiap detik t:
+ *        x(t)  = vx * t = v0 * cos(theta) * t
+ * 
+ * 2. SUMBU VERTIKAL (Y) -> Gerak Lurus Berubah Beraturan (GLBB):
+ *    - Bekerja gaya gravitasi konstan ke bawah (ay = -g).
+ *    - Komponen kecepatan vertikal berubah linear terhadap waktu:
+ *        vy(t) = v0 * sin(theta) - g * t
+ *    - Posisi vertikal proyektil (memperhitungkan ketinggian awal h0):
+ *        y(t)  = h0 + v0 * sin(theta) * t - 0.5 * g * t^2
+ * 
+ * 3. BESAR DAN ARAH KECEPATAN RESULTAN:
+ *    - Besar laju sesaat: v(t) = sqrt(vx(t)^2 + vy(t)^2)
+ *    - Arah kemiringan gerak: alpha = arctan(vy / vx)
+ * 
+ * 4. PARAMETER TITIK PUNCAK & PENDARATAN:
+ *    - Waktu menuju titik tertinggi (vy = 0):
+ *        tp = (v0 * sin(theta)) / g
+ *    - Ketinggian maksimum total dari tanah:
+ *        Hmax = h0 + (v0^2 * sin^2(theta)) / (2 * g)
+ *    - Waktu total melayang di udara sampai menyentuh tanah (y = 0):
+ *        t_total = (v0 * sin(theta) + sqrt((v0 * sin(theta))^2 + 2 * g * h0)) / g
+ *    - Jarak jangkauan horizontal terjauh:
+ *        Rmax = vx * t_total = v0 * cos(theta) * t_total
+ *    - Laju akhir sesaat sebelum menyentuh tanah (Hukum Kekekalan Energi):
+ *        v_land = sqrt(v0^2 + 2 * g * h0)
+ * =========================================================================================
  */
 
-// --- Parameter Simulasi Fisika ---
-let v0 = 42;                     // Kecepatan awal (m/s), range: 10 - 100 m/s
-let angleDeg = 45;               // Sudut elevasi (derajat), range: 0 - 90 deg
-let gravity = 9.8;               // Gravitasi (m/s^2), range: 1 - 20 m/s^2
-let h0 = 12;                     // Ketinggian awal (meter), range: 0 - 50 m
+// =========================================================================================
+// BAGIAN 1: VARIABEL & PARAMETER SIMULASI
+// =========================================================================================
 
-// --- Status Simulasi ---
-let simState = 'IDLE';           // 'IDLE', 'FLYING', 'PAUSED', 'LANDED'
-let simTime = 0;                 // Waktu berjalan (detik)
-let simSpeed = 1.0;              // Kecepatan animasi (1.0x, 0.5x, 0.25x)
-const dt = 1 / 60;               // Waktu per frame (60 FPS)
+// --- Parameter Fisika Input ---
+let v0 = 42;                     // Kecepatan awal proyektil (m/s), batas: 10 - 100 m/s
+let angleDeg = 45;               // Sudut elevasi penembakan (derajat), batas: 0 - 90 derajat
+let h0 = 12;                     // Ketinggian awal peluncur dari tanah (meter), batas: 0 - 50 m
+let gravity = 9.8;               // Percepatan gravitasi (m/s^2), batas: 1 - 20 m/s^2
 
-// --- Keadaan Proyektil (Burung / Peluru) ---
+// --- Status Mesin Simulasi (State Machine) ---
+// 'IDLE'   : Diam di peluncur, siap ditembakkan
+// 'FLYING' : Sedang melayang di udara
+// 'PAUSED' : Dijeda sementara
+// 'LANDED' : Sudah menyentuh tanah / selesai melayang
+let simState = 'IDLE';
+let simTime = 0;                 // Stopwatch waktu gerak proyektil (detik)
+let simSpeed = 1.0;              // Pengali laju animasi (1.0x normal, 0.5x, 0.25x slow motion)
+const dt = 1 / 60;               // Langkah delta waktu per frame pada standar layar 60 FPS
+
+// --- Objek Keadaan Proyektil (Posisi & Vektor Gerak) ---
 let proj = {
-  x: 0,
-  y: 0,
-  vx: 0,
-  vy: 0,
-  v: 0,
-  rotation: 0
+  x: 0,                          // Koordinat jarak horizontal saat ini (meter)
+  y: 0,                          // Koordinat tinggi vertikal saat ini (meter)
+  vx: 0,                         // Komponen kecepatan horizontal saat ini (m/s)
+  vy: 0,                         // Komponen kecepatan vertikal saat ini (m/s)
+  v: 0,                          // Resultan kecepatan saat ini (m/s)
+  rotation: 0                    // Sudut rotasi visual karakter sesuai arah geraknya
 };
 
-// --- Titik Sampel Lintasan yang Bisa Diklik (Trajectory Inspection Nodes) ---
-let sampledNodes = [];           // Array objek data [{ t, x, y, vx, vy, v, deg }]
-let selectedNode = null;         // Titik yang sedang diklik/diinspeksi oleh pengguna
-let hoveredNode = null;          // Titik yang sedang disorot kursor mouse
-let lastSampleTime = 0;          // Interval pencatatan titik sampel (tiap 0.12 detik)
+// --- Riwayat Garis Lintasan (Trajectory Trails) ---
+let currentTrail = [];           // Menyimpan titik-titik lintasan tembakan aktif
+let pastTrails = [];             // Menyimpan riwayat lintasan tembakan sebelumnya untuk perbandingan
 
-// --- Riwayat Lintasan (Trails) ---
-let currentTrail = [];           // Jejak garis aktif
-let pastTrails = [];             // Jejak garis tembakan sebelumnya
+// --- Titik Sampel Lintasan untuk Fitur Inspeksi (Click to Inspect) ---
+let sampledNodes = [];           // Menyimpan data lengkap titik: [{ t, x, y, vx, vy, v, deg }]
+let selectedNode = null;         // Titik yang sedang aktif diklik dan ditampilkan kartunya
+let hoveredNode = null;          // Titik yang sedang disentuh oleh kursor mouse
+let lastSampleTime = 0;          // Pencatat interval pencuplikan titik (tiap 0.12 detik)
 
-// --- Sistem Mode Tantangan (Target Menara Kayu) ---
-let challengeMode = true;
+// --- Misi Mode Tantangan (Angry Birds Challenge Target) ---
 let target = {
-  x: 68,                         // Jarak horizontal target (meter)
-  y: 8,                          // Ketinggian target dari tanah (meter)
-  radius: 3.2,                   // Radius area tabrakan (meter)
-  isHit: false,                  // Status terkena tembakan
-  hitAnim: 0,                    // Timer animasi hancur
-  score: 0,                      // Total skor kemenangan
-  combo: 0                       // Jumlah hit berturut-turut
+  x: 68,                         // Posisi horizontal sasaran (meter)
+  y: 8,                          // Ketinggian sasaran dari tanah (meter)
+  radius: 3.2,                   // Radius area tabrakan sasaran (meter)
+  isHit: false,                  // Status apakah sasaran sudah terkena tembakan
+  score: 0                       // Akumulasi skor pemain
 };
 
-// --- Partikel Visual (Konfeti, Bintang, Asap, Percikan) ---
-let particles = [];
-let confetti = [];
-let clouds = [];
+// --- Efek Visual Partikel ---
+let particles = [];              // Partikel asap dan percikan tanah
+let confetti = [];               // Partikel konfeti warna-warni saat target hancur
+let clouds = [];                 // Awan kartun yang bergerak di latar belakang
 
-// --- Tampilan & Pengaturan Visual ---
-let showVectors = true;
-let showTrail = true;
-let showTheoreticalPath = true;
-let showMarkers = true;
-let autoScale = true;
+// --- Pengaturan Tampilan Visual (Toggle) ---
+let showVectors = true;          // Tampilkan panah vektor kecepatan (vx, vy, v)
+let showTrail = true;            // Tampilkan garis jejak lintasan
+let showTheoreticalPath = true;  // Tampilkan garis putus-putus perkiraan lintasan analitis
+let showMarkers = true;          // Tampilkan penanda puncak (Hmax) dan pendaratan (Rmax)
+let autoScale = true;            // Penyesuaian skala otomatis agar seluruh parabola muat di layar
 
-// --- Status Drag Interaktif Mouse ---
-let isAimingCannon = false;
-let isDraggingPlatform = false;
+// --- Status Interaksi Mouse Dragging ---
+let isAimingCannon = false;      // Sedang menyeret laras meriam dengan mouse
+let isDraggingPlatform = false;  // Sedang menyeret tebing/platform naik-turun dengan mouse
 
-// --- Konfigurasi Koordinat Tampilan ---
-const ORIGIN_X = 90;
-const GROUND_Y = 470;
-const VIEW_W = 880;
-const VIEW_H = 410;
-let meterToPixel = 3.6;
+// --- Konfigurasi Koordinat Kanvas ---
+const ORIGIN_X = 90;             // Titik X poros pangkal peluncur di kanvas (pixel)
+const GROUND_Y = 470;            // Garis permukaan tanah di kanvas (pixel)
+const VIEW_W = 880;              // Lebar efektif area visualisasi (pixel)
+const VIEW_H = 410;              // Tinggi efektif area visualisasi (pixel)
+let meterToPixel = 3.6;          // Rasio konversi skala: berapa pixel mewakili 1 meter di dunia nyata
 
-// --- UI Komponen (Sliders & Buttons bergaya Kartun) ---
-let sliders = {};
-let buttons = [];
-let presetButtons = [];
+// --- Elemen Antarmuka Pengguna (UI Komponen) ---
+let sliders = {};                // Objek penyimpan 4 slider utama (v0, theta, h0, g)
+let buttons = [];                // Objek penyimpan tombol aksi utama
 
-// ----------------------------------------------------------------------------
-// SETUP p5.js
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 2: FUNGSI SETUP (DIJALANKAN SEKALI SAAT APLIKASI DIMULAI)
+// =========================================================================================
 function setup() {
-  createCanvas(1040, 725);
+  createCanvas(1040, 720);
   textFont('Segoe UI, Tahoma, sans-serif');
 
-  // Inisialisasi Awan Melayang di Langit
+  // Membuat awan-awan acak di latar belakang langit
   for (let i = 0; i < 6; i++) {
     clouds.push({
       x: random(width),
@@ -105,24 +136,33 @@ function setup() {
     });
   }
 
-  // 1. Slider Kecepatan Awal
-  sliders.v0 = new CartoonSlider(40, 560, 215, 10, 100, v0, 'Kecepatan Awal (v₀)', 'm/s', 1, '#ff5722');
+  // ---------------------------------------------------------------------------------------
+  // Inisialisasi 4 Slider Parameter Fisika (Tata Letak Rapi Tanpa Tombol Preset)
+  // Format: CartoonSlider(x, y, lebar, minVal, maxVal, nilaiAwal, label, satuan, step, warna)
+  // ---------------------------------------------------------------------------------------
+  // Slider 1: Kecepatan Awal (v0)
+  sliders.v0 = new CartoonSlider(45, 545, 215, 10, 100, v0, 'Kecepatan Awal (v₀)', 'm/s', 1, '#ff5722');
 
-  // 2. Slider Sudut Elevasi
-  sliders.angle = new CartoonSlider(280, 560, 215, 0, 90, angleDeg, 'Sudut Elevasi (θ)', '°', 1, '#ff9800');
+  // Slider 2: Sudut Elevasi (theta)
+  sliders.angle = new CartoonSlider(285, 545, 215, 0, 90, angleDeg, 'Sudut Elevasi (θ)', '°', 1, '#ff9800');
 
-  // 3. Slider Ketinggian Awal
-  sliders.h0 = new CartoonSlider(520, 560, 215, 0, 50, h0, 'Ketinggian Awal (h₀)', 'm', 1, '#4caf50');
+  // Slider 3: Ketinggian Awal (h0)
+  sliders.h0 = new CartoonSlider(525, 545, 215, 0, 50, h0, 'Ketinggian Awal (h₀)', 'm', 1, '#4caf50');
 
-  // 4. Slider Gravitasi
-  sliders.gravity = new CartoonSlider(760, 560, 215, 1.0, 20.0, gravity, 'Gravitasi (g)', 'm/s²', 0.1, '#00bcd4');
+  // Slider 4: Percepatan Gravitasi (g)
+  sliders.gravity = new CartoonSlider(765, 545, 215, 1.0, 20.0, gravity, 'Percepatan Gravitasi (g)', 'm/s²', 0.1, '#00bcd4');
 
-  // Tombol Aksi Utama
-  buttons.push(new CartoonButton(40, 660, 130, 38, '🚀 TEMBAK!', '#4caf50', '#388e3c', () => {
+  // ---------------------------------------------------------------------------------------
+  // Inisialisasi Tombol Kontrol Aksi Utama di Bagian Bawah
+  // Format: CartoonButton(x, y, lebar, tinggi, label, warnaDasar, warnaHover, fungsiAksi)
+  // ---------------------------------------------------------------------------------------
+  // Tombol 1: Tembak Proyektil
+  buttons.push(new CartoonButton(45, 642, 130, 38, '🚀 TEMBAK!', '#4caf50', '#388e3c', () => {
     fireProjectile();
   }));
 
-  buttons.push(new CartoonButton(180, 660, 115, 38, '⏸ JEDA', '#2196f3', '#1976d2', function() {
+  // Tombol 2: Jeda / Lanjutkan Animasi
+  buttons.push(new CartoonButton(185, 642, 115, 38, '⏸ JEDA', '#2196f3', '#1976d2', function() {
     if (simState === 'FLYING') {
       simState = 'PAUSED';
       this.label = '▶ LANJUT';
@@ -136,17 +176,18 @@ function setup() {
     }
   }));
 
-  buttons.push(new CartoonButton(305, 660, 105, 38, '🔄 RESET', '#f44336', '#d32f2f', () => {
+  // Tombol 3: Reset Posisi ke Titik Awal
+  buttons.push(new CartoonButton(310, 642, 105, 38, '🔄 RESET', '#f44336', '#d32f2f', () => {
     resetSimulation();
   }));
 
-  // Tombol Tantangan Baru (Acak Posisi Sasaran)
-  buttons.push(new CartoonButton(420, 660, 140, 38, '🎯 TARGET BARU', '#9c27b0', '#7b1fa2', () => {
+  // Tombol 4: Acak Posisi Sasaran Tantangan Baru
+  buttons.push(new CartoonButton(425, 642, 140, 38, '🎯 TARGET BARU', '#9c27b0', '#7b1fa2', () => {
     randomizeTarget();
   }));
 
-  // Tombol Pilihan Kecepatan Animasi
-  buttons.push(new CartoonButton(570, 660, 125, 38, '⏱ Laju: 1.0x', '#607d8b', '#455a64', function() {
+  // Tombol 5: Pengatur Laju Kecepatan Simulasi (Slow-Mo)
+  buttons.push(new CartoonButton(575, 642, 125, 38, '⏱ Laju: 1.0x', '#607d8b', '#455a64', function() {
     if (simSpeed === 1.0) {
       simSpeed = 0.5;
       this.label = '⏱ Slow: 0.5x';
@@ -159,83 +200,29 @@ function setup() {
     }
   }));
 
-  // Tombol Toggle Vektor
-  buttons.push(new CartoonButton(705, 660, 125, 38, '🏹 Vektor: ON', '#3f51b5', '#303f9f', function() {
+  // Tombol 6: Toggle Visibilitas Panah Vektor Kecepatan
+  buttons.push(new CartoonButton(710, 642, 125, 38, '🏹 Vektor: ON', '#3f51b5', '#303f9f', function() {
     showVectors = !showVectors;
     this.label = showVectors ? '🏹 Vektor: ON' : '🏹 Vektor: OFF';
   }));
 
-  // Tombol Hapus Jejak & Inspeksi
-  buttons.push(new CartoonButton(840, 660, 140, 38, '🧹 Bersihkan Titik', '#78909c', '#546e7a', () => {
+  // Tombol 7: Bersihkan Jejak & Titik Inspeksi
+  buttons.push(new CartoonButton(845, 642, 145, 38, '🧹 Hapus Titik', '#78909c', '#546e7a', () => {
     pastTrails = [];
     currentTrail = [];
     sampledNodes = [];
     selectedNode = null;
   }));
-
-  // Presets Sudut
-  const anglePresets = [
-    { name: '0° Datar', a: 0 },
-    { name: '30°', a: 30 },
-    { name: '45°', a: 45 },
-    { name: '60°', a: 60 }
-  ];
-  for (let i = 0; i < anglePresets.length; i++) {
-    presetButtons.push({
-      x: 280 + i * 54,
-      y: 512,
-      w: 49,
-      h: 22,
-      label: anglePresets[i].name,
-      a: anglePresets[i].a
-    });
-  }
-
-  // Presets Ketinggian
-  const heightPresets = [
-    { name: '0m', h: 0 },
-    { name: '10m', h: 10 },
-    { name: '25m', h: 25 },
-    { name: '40m', h: 40 }
-  ];
-  for (let i = 0; i < heightPresets.length; i++) {
-    presetButtons.push({
-      x: 520 + i * 54,
-      y: 512,
-      w: 49,
-      h: 22,
-      label: heightPresets[i].name,
-      h: heightPresets[i].h
-    });
-  }
-
-  // Presets Gravitasi
-  const gravPresets = [
-    { name: '🌍 Bumi', g: 9.8 },
-    { name: '🌕 Bulan', g: 1.62 },
-    { name: '🔴 Mars', g: 3.71 },
-    { name: '🪐 Yupiter', g: 20.0 }
-  ];
-  for (let i = 0; i < gravPresets.length; i++) {
-    presetButtons.push({
-      x: 760 + i * 54,
-      y: 512,
-      w: 49,
-      h: 22,
-      label: gravPresets[i].name,
-      g: gravPresets[i].g
-    });
-  }
 }
 
-// ----------------------------------------------------------------------------
-// DRAW LOOP p5.js
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 3: DRAW LOOP UTAMA (DIULANG TERUS MENERUS ~60 KALI PER DETIK)
+// =========================================================================================
 function draw() {
-  // 1. Gambar Langit Cerah, Matahari, Awan, dan Perbukitan
+  // 1. Gambar Langit Biru, Matahari Cerah, Awan Bergerak, dan Perbukitan Hijau
   drawCartoonEnvironment();
 
-  // 2. Sinkronkan nilai kontrol saat tidak melayang
+  // 2. Baca Nilai Parameter dari Slider (bila proyektil sedang diam/idle)
   if (simState === 'IDLE') {
     v0 = sliders.v0.value;
     angleDeg = sliders.angle.value;
@@ -245,101 +232,127 @@ function draw() {
     proj.y = h0;
   }
 
-  // 3. Kalkulasi Analitis Fisika
+  // 3. Lakukan Perhitungan Analitis Lengkap & Sesuaikan Skala Tampilan
   let ana = calculateAnalytical(v0, angleDeg, h0, gravity);
   updateScale(ana.Rmax, ana.Hmax);
 
-  // 4. Update Fisika Proyektil
+  // 4. Update Posisi Fisika Numerik Proyektil (bila sedang melayang)
   if (simState === 'FLYING') {
     updatePhysics(ana);
   }
 
-  // 5. Update Partikel Visual (Asap, Bintang, Konfeti)
+  // 5. Update Partikel Animasi (Asap, Percikan Tanah, dan Konfeti Kemenangan)
   updateParticles();
 
-  // 6. Gambar Grid Ukur Meter
+  // 6. Gambar Garis Penggaris Ukur Satuan Meter (Grid Pengukuran)
   drawMeterRuler(ana.Rmax, ana.Hmax);
 
-  // 7. Gambar Platform Tebing Kayu/Batu
+  // 7. Gambar Platform / Menara Tebing Ketinggian Awal (h0)
   let cannonY = GROUND_Y - h0 * meterToPixel;
   drawWoodenPlatform(ORIGIN_X, GROUND_Y, cannonY, h0);
 
-  // 8. Gambar Preview Garis Teoretis
+  // 8. Gambar Lintasan Putus-Putus Preview Teoretis
   if (showTheoreticalPath) {
     drawTheoreticalPath(v0, angleDeg, h0, gravity, ana.tTotal);
   }
 
-  // 9. Gambar Jejak Terdahulu & Jejak Aktif
+  // 9. Gambar Jejak Tembakan Sebelumnya & Jejak Tembakan Aktif
   if (showTrail) {
     drawPastTrails();
     drawCurrentTrail();
   }
 
-  // 10. Gambar Titik-Titik Sampel Lintasan (Interactive Clickable Nodes)
+  // 10. Gambar Titik-Titik Sampel Lintasan (Bisa Diklik untuk Diinspeksi)
   drawSampledNodes();
 
-  // 11. Gambar Sasaran Tantangan (Target Menara Karakter)
+  // 11. Gambar Sasaran Menara Karakter (Target Tantangan)
   drawChallengeTarget();
 
-  // 12. Gambar Penanda Titik Tertinggi (Hmax) & Titik Jatuh (Rmax)
+  // 12. Gambar Marker Titik Tertinggi (Hmax) dan Jarak Terjauh (Rmax)
   if (showMarkers) {
     drawMarkers(ana);
   }
 
-  // 13. Gambar Peluncur Ketapel/Meriam Kayu
+  // 13. Gambar Peluncur Meriam Kayu (Bisa Ditarik Langsung untuk Mengubah Sudut)
   drawCartoonLauncher(ORIGIN_X, cannonY, angleDeg);
 
-  // 14. Gambar Bola Karakter Proyektil & Vektor Kecepatan
+  // 14. Gambar Proyektil Karakter Burung Merah & Vektor Kecepatannya
   drawCharacterProjectile(ORIGIN_X, cannonY, ana);
 
-  // 15. Gambar Partikel Visual
+  // 15. Gambar Partikel Visual di Layar
   drawParticles();
 
-  // 16. Gambar Kartu Detail Inspeksi Titik (Jika Ada Titik yang Diklik)
+  // 16. Gambar Kartu Pop-up Telemetri Detail Titik yang Diklik (Jika Ada)
   if (selectedNode) {
     drawNodeInspectorCard(selectedNode);
   }
 
-  // 17. Gambar Panel Telemetri Data & Papan Skor Tantangan
+  // 17. Gambar Panel Telemetri Real-Time & Papan Misi Tantangan
   drawTelemetryOverlay(ana);
   drawChallengeBanner();
 
-  // 18. Gambar Panel Kontrol Bawah
+  // 18. Gambar Panel Kontrol Slider & Tombol di Bagian Bawah
   drawControlInterface();
 
-  // 19. Update Kursor Mouse Interaktif
+  // 19. Perbarui Bentuk Kursor Mouse Berdasarkan Area Interaksi
   updateMouseCursor(cannonY);
 }
 
-// ----------------------------------------------------------------------------
-// KALKULASI ANALITIS FISIKA IDEAL
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 4: KALKULASI ANALITIS FISIKA IDEAL
+// =========================================================================================
+/**
+ * Menghitung seluruh besaran fisik gerak parabola secara analitis berdasarkan rumus fisika murni.
+ * @param {number} v_init - Kecepatan awal proyektil (m/s)
+ * @param {number} deg - Sudut elevasi tembakan (derajat)
+ * @param {number} y0 - Ketinggian awal peluncur dari tanah (meter)
+ * @param {number} g_acc - Percepatan gravitasi (m/s^2)
+ * @returns {object} Kumpulan parameter analitis terhitung
+ */
 function calculateAnalytical(v_init, deg, y0, g_acc) {
   let rad = radians(deg);
+  // Komponen kecepatan awal pada sumbu X dan Y
   let v0x = v_init * Math.cos(rad);
   let v0y = v_init * Math.sin(rad);
 
+  // Waktu mencapai titik puncak (terjadi saat vy = 0 -> 0 = v0y - g*tp)
   let tPeak = (g_acc > 0 && v0y > 0) ? (v0y / g_acc) : 0;
+
+  // Tinggi maksimum diukur dari tanah (Hmax = y0 + v0y^2 / (2g))
   let Hmax = (g_acc > 0 && v0y > 0) ? (y0 + (v0y * v0y) / (2 * g_acc)) : y0;
+
+  // Jarak horizontal saat proyektil berada di titik puncak
   let xPeak = v0x * tPeak;
 
+  // Waktu total melayang di udara sampai menyentuh tanah (y = 0):
+  // Dari rumus GLBB: 0 = y0 + v0y*t - 0.5*g*t^2  => 0.5*g*t^2 - v0y*t - y0 = 0
+  // Menggunakan rumus kuadrat ABC: t = (-b +/- sqrt(b^2 - 4ac)) / (2a)
   let discriminant = v0y * v0y + 2 * g_acc * y0;
   let tTotal = 0;
   if (g_acc > 0 && discriminant >= 0) {
     tTotal = (v0y + Math.sqrt(discriminant)) / g_acc;
   }
 
+  // Jangkauan horizontal maksimum saat jatuh di tanah (Rmax = vx * t_total)
   let Rmax = v0x * tTotal;
+
+  // Kelajuan akhir sesaat sebelum menyentuh tanah (Kekekalan Energi Mekanik: 1/2 m v^2 = 1/2 m v0^2 + m g y0)
   let vLand = Math.sqrt(v_init * v_init + 2 * g_acc * y0);
 
   return { rad, v0x, v0y, tPeak, Hmax, tTotal, Rmax, xPeak, vLand };
 }
 
-// ----------------------------------------------------------------------------
-// ADAPTIVE AUTO-SCALE
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 5: SISTEM SKALA ADAPTIF OTOMATIS (AUTO-SCALING)
+// =========================================================================================
+/**
+ * Menyesuaikan perbandingan pixel-ke-meter secara otomatis sehingga seluruh kurva parabola
+ * serta sasaran target selalu muat secara proporsional di dalam kanvas tampilan.
+ */
 function updateScale(Rmax, Hmax) {
   if (!autoScale) return;
+
+  // Batas referensi horizontal dan vertikal yang harus terlihat
   let maxRefX = Math.max(Rmax, target.x + 10, 20);
   let maxRefY = Math.max(Hmax, target.y + 10, 15);
 
@@ -350,14 +363,18 @@ function updateScale(Rmax, Hmax) {
   let targetScaleY = safeH / maxRefY;
   let targetScale = constrain(Math.min(targetScaleX, targetScaleY), 0.05, 10.0);
 
+  // Lakukan transisi halus (lerp) saat idle
   if (simState === 'IDLE' && !isDraggingPlatform) {
     meterToPixel = lerp(meterToPixel, targetScale, 0.15);
   }
 }
 
-// ----------------------------------------------------------------------------
-// SISTEM FISIKA & DETEKSI TABRAKAN TANTANGAN
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 6: LOGIKA TEMBAK, INTEGRASI FISIKA NUMERIK, & DETEKSI TABRAKAN
+// =========================================================================================
+/**
+ * Memulai peluncuran proyektil dan mencatat status awal
+ */
 function fireProjectile() {
   v0 = sliders.v0.value;
   angleDeg = sliders.angle.value;
@@ -374,6 +391,7 @@ function fireProjectile() {
   proj.v = v0;
   proj.rotation = -radians(angleDeg);
 
+  // Simpan jejak sebelumnya ke dalam riwayat
   if (currentTrail.length > 1) {
     pastTrails.push([...currentTrail]);
     if (pastTrails.length > 5) pastTrails.shift();
@@ -382,10 +400,10 @@ function fireProjectile() {
   sampledNodes = [];
   selectedNode = null;
 
-  // Catat titik awal (t = 0)
+  // Tambahkan titik sampel awal (t = 0 detik)
   addSampledNode(0, proj.x, proj.y, proj.vx, proj.vy, proj.v);
 
-  // Efek Asap Peluncuran
+  // Buat efek kepulan asap peluncuran dari moncong meriam
   let rad = radians(angleDeg);
   let cannonY = GROUND_Y - h0 * meterToPixel;
   let muzzleX = ORIGIN_X + 46 * Math.cos(rad);
@@ -394,6 +412,7 @@ function fireProjectile() {
 
   simState = 'FLYING';
 
+  // Perbarui label tombol jeda
   let pauseBtn = buttons.find(b => b.label.includes('JEDA') || b.label.includes('LANJUT'));
   if (pauseBtn) {
     pauseBtn.label = '⏸ JEDA';
@@ -402,40 +421,48 @@ function fireProjectile() {
   }
 }
 
+/**
+ * Memperbarui posisi, kecepatan, dan waktu proyektil setiap frame saat terbang
+ */
 function updatePhysics(ana) {
   let effectiveDt = dt * simSpeed;
   simTime += effectiveDt;
 
+  // Persamaan Gerak Parabola Murni pada Waktu t:
+  // Horisontal (GLB): x = v0x * t
   proj.x = ana.v0x * simTime;
+
+  // Vertikal (GLBB): y = h0 + v0y * t - 1/2 * g * t^2
   proj.y = h0 + (ana.v0y * simTime) - (0.5 * gravity * simTime * simTime);
 
+  // Komponen kecepatan sesaat:
   proj.vx = ana.v0x;
   proj.vy = ana.v0y - (gravity * simTime);
   proj.v = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
-  proj.rotation = Math.atan2(-proj.vy, proj.vx); // Sudut orientasi gerak
+  proj.rotation = Math.atan2(-proj.vy, proj.vx); // Sudut kemiringan vektor kecepatan
 
+  // Rekam titik ke jejak lintasan
   currentTrail.push({ x: proj.x, y: proj.y });
 
-  // Catat titik inspeksi secara berkala (tiap ~0.12 detik)
+  // Ambil titik sampel inspeksi setiap selang waktu ~0.12 detik
   if (simTime - lastSampleTime >= 0.12) {
     lastSampleTime = simTime;
     addSampledNode(simTime, proj.x, proj.y, proj.vx, proj.vy, proj.v);
   }
 
-  // Deteksi Tabrakan dengan Sasaran Tantangan (Target Collision)
+  // Deteksi Tabrakan dengan Target Tantangan (Mode Permainan)
   if (!target.isHit) {
     let dTarget = dist(proj.x, proj.y, target.x, target.y);
     if (dTarget <= target.radius) {
       target.isHit = true;
       target.score += 100;
-      target.combo += 1;
       let targetPx = ORIGIN_X + target.x * meterToPixel;
       let targetPy = GROUND_Y - target.y * meterToPixel;
       createVictoryConfetti(targetPx, targetPy);
     }
   }
 
-  // Deteksi Mendarat di Tanah (y <= 0)
+  // Deteksi Mendarat di Tanah (saat y <= 0 atau waktu tempuh mencapai tTotal)
   if (simTime >= ana.tTotal || (proj.y <= 0 && simTime > 0.04)) {
     proj.x = ana.Rmax;
     proj.y = 0;
@@ -445,7 +472,7 @@ function updatePhysics(ana) {
     simTime = ana.tTotal;
     simState = 'LANDED';
 
-    // Catat titik akhir saat mendarat
+    // Tambahkan titik sampel terakhir tepat saat mendarat
     addSampledNode(simTime, proj.x, proj.y, proj.vx, proj.vy, proj.v);
 
     let landPx = ORIGIN_X + proj.x * meterToPixel;
@@ -453,6 +480,9 @@ function updatePhysics(ana) {
   }
 }
 
+/**
+ * Menyimpan data fisika lengkap pada suatu titik lintasan untuk fitur inspeksi
+ */
 function addSampledNode(t, x, y, vx, vy, v) {
   let deg = degrees(Math.atan2(vy, vx));
   sampledNodes.push({
@@ -466,6 +496,9 @@ function addSampledNode(t, x, y, vx, vy, v) {
   });
 }
 
+/**
+ * Mengembalikan simulasi ke kondisi awal (IDLE)
+ */
 function resetSimulation() {
   simState = 'IDLE';
   simTime = 0;
@@ -489,6 +522,9 @@ function resetSimulation() {
   }
 }
 
+/**
+ * Mengacak koordinat posisi target tantangan baru
+ */
 function randomizeTarget() {
   target.x = Math.round(random(35, 120));
   target.y = Math.round(random(2, 28));
@@ -496,13 +532,12 @@ function randomizeTarget() {
   resetSimulation();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR LINGKUNGAN CERAH (SKY, SUN, CLOUDS, HILLS, GROUND)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 7: PENGGAMBARAN ALAM & LINGKUNGAN KARTUN (ANGRY BIRDS THEME)
+// =========================================================================================
 function drawCartoonEnvironment() {
   push();
-
-  // 1. Gradasi Langit Biru Cerah
+  // Gradasi warna langit biru segar
   let skyTop = color(68, 178, 255);
   let skyBottom = color(196, 238, 255);
   for (let y = 0; y <= GROUND_Y + 30; y += 4) {
@@ -512,7 +547,7 @@ function drawCartoonEnvironment() {
     line(0, y, width, y);
   }
 
-  // 2. Matahari Kartun Bersinar di Kanan Atas
+  // Matahari kartun bersinar
   noStroke();
   fill(255, 235, 59, 70);
   ellipse(width - 110, 80, 110, 110);
@@ -521,10 +556,10 @@ function drawCartoonEnvironment() {
   fill(255, 241, 118);
   ellipse(width - 110, 80, 56, 56);
 
-  // 3. Awan Kartun Bergerak
+  // Awan melayang
   drawClouds();
 
-  // 4. Perbukitan Latar Belakang (Distant Hills)
+  // Perbukitan hijau latar belakang
   fill(140, 214, 112);
   noStroke();
   ellipse(260, GROUND_Y + 70, 720, 240);
@@ -533,23 +568,22 @@ function drawCartoonEnvironment() {
   fill(108, 196, 85);
   ellipse(480, GROUND_Y + 80, 800, 200);
 
-  // 5. Permukaan Tanah & Rumput Kartun (Ground Layers)
-  // Lapisan Tanah Coklat Subur
+  // Lapisan tanah cokelat kartun
   fill(166, 115, 68);
   rect(0, GROUND_Y, width, height - GROUND_Y);
 
-  // Lapisan Batu Kecil di Tanah
+  // Batu-batu kecil di tanah
   fill(138, 92, 51);
   for (let bx = 40; bx < width; bx += 85) {
     ellipse(bx, GROUND_Y + 22, 14, 8);
     ellipse(bx + 40, GROUND_Y + 36, 10, 6);
   }
 
-  // Strip Rumput Hijau Segar
+  // Lapisan rumput hijau cerah
   fill(76, 175, 80);
   rect(0, GROUND_Y, width, 14);
 
-  // Aksen Gelombang Rumput Kartun
+  // Gelombang rumput kartun
   fill(102, 187, 106);
   for (let rx = 0; rx < width; rx += 22) {
     triangle(rx, GROUND_Y, rx + 11, GROUND_Y - 7, rx + 22, GROUND_Y);
@@ -576,9 +610,9 @@ function drawClouds() {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR GRID & METER RULER
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 8: PENGGARIS SKALA SATUAN METER (GRID SYSTEM)
+// =========================================================================================
 function drawMeterRuler(Rmax, Hmax) {
   push();
   let stepMeter = 10;
@@ -589,6 +623,7 @@ function drawMeterRuler(Rmax, Hmax) {
   else if (meterToPixel < 6.5) stepMeter = 10;
   else stepMeter = 5;
 
+  // Garis kisi vertikal (jarak horizontal X)
   let maxXMeter = (width - 60 - ORIGIN_X) / meterToPixel;
   for (let m = 0; m <= maxXMeter; m += stepMeter) {
     let px = ORIGIN_X + m * meterToPixel;
@@ -600,7 +635,7 @@ function drawMeterRuler(Rmax, Hmax) {
     line(px, 35, px, GROUND_Y);
     drawingContext.setLineDash([]);
 
-    // Angka Meter pada Tanah
+    // Label angka meter di tanah
     noStroke();
     fill(255);
     textSize(10);
@@ -610,7 +645,7 @@ function drawMeterRuler(Rmax, Hmax) {
     textStyle(NORMAL);
   }
 
-  // Garis Pengukur Vertikal
+  // Garis kisi horizontal (ketinggian vertikal Y)
   let maxYMeter = (GROUND_Y - 35) / meterToPixel;
   for (let m = stepMeter; m <= maxYMeter; m += stepMeter) {
     let py = GROUND_Y - m * meterToPixel;
@@ -622,6 +657,7 @@ function drawMeterRuler(Rmax, Hmax) {
     line(ORIGIN_X - 10, py, width - 40, py);
     drawingContext.setLineDash([]);
 
+    // Label angka meter di sisi kiri
     noStroke();
     fill(255);
     textSize(10);
@@ -633,9 +669,9 @@ function drawMeterRuler(Rmax, Hmax) {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR PLATFORM TEBING KAYU (ANGRY BIRDS STYLE)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 9: PENGGAMBARAN PLATFORM TEBING KAYU (KETINGGIAN AWAL h0)
+// =========================================================================================
 function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
   if (currentH0 <= 0.05) return;
   push();
@@ -645,13 +681,13 @@ function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
   let platW = platRight - platLeft;
   let platH = groundY - cannonY;
 
-  // Tiang Menara Kayu
+  // Tiang Menara Kayu Tebing
   fill(160, 95, 45);
   stroke(105, 55, 20);
   strokeWeight(2.5);
   rect(platLeft, cannonY, platW, platH, 4, 4, 0, 0);
 
-  // Palang Kayu Penguat (Cross Beams)
+  // Palang Kayu Penopang Bersilang
   stroke(105, 55, 20);
   strokeWeight(2);
   for (let y = groundY; y >= cannonY + 25; y -= 35) {
@@ -659,13 +695,13 @@ function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
     line(platLeft + 2, y - 25, platRight - 2, y);
   }
 
-  // Papan Atas Tempat Dudukan Peluncur
+  // Papan Atas Dudukan Meriam
   fill(210, 140, 75);
   stroke(95, 45, 15);
   strokeWeight(2.5);
   rect(platLeft - 4, cannonY - 6, platW + 8, 9, 3);
 
-  // Label Ketinggian h0
+  // Badge Keterangan Ketinggian Awal (h0)
   fill(255);
   stroke(105, 55, 20);
   strokeWeight(2);
@@ -679,7 +715,7 @@ function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
   text('h₀: ' + currentH0.toFixed(0) + 'm', platLeft + platW / 2, (groundY + cannonY) / 2);
   textStyle(NORMAL);
 
-  // Handle Drag Ketinggian
+  // Handle Drag Ketinggian (Ikon Pegangan Mouse)
   fill(255, 215, 0);
   stroke(180, 130, 0);
   strokeWeight(1.5);
@@ -691,13 +727,14 @@ function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR PELUNCUR MERIAM KARTUN (INTERACTIVE DRAG BARREL)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 10: PENGGAMBARAN PELUNCUR MERIAM KARTUN (INTERACTIVE DRAG BARREL)
+// =========================================================================================
 function drawCartoonLauncher(baseX, cannonY, angle) {
   push();
   translate(baseX, cannonY);
 
+  // Sorotan lingkaran saat kursor berada di dekat peluncur
   let dMouse = dist(mouseX, mouseY, baseX, cannonY);
   let isHover = (dMouse < 75 && simState === 'IDLE');
 
@@ -710,7 +747,7 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
     drawingContext.setLineDash([]);
   }
 
-  // Roda Peluncur Kayu
+  // Roda Kayu Peluncur
   fill(160, 95, 45);
   stroke(90, 45, 15);
   strokeWeight(2.5);
@@ -720,22 +757,22 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   fill(90, 45, 15);
   ellipse(0, 4, 7, 7);
 
-  // Rotasi Laras Meriam
+  // Putar Laras Sesuai Sudut Elevasi
   rotate(-radians(angle));
 
-  // Laras Meriam Merah Ceria (Angry Bird Color)
+  // Laras Meriam Merah Kartun
   fill(isAimingCannon ? '#e53935' : '#d32f2f');
   stroke(70, 15, 15);
   strokeWeight(2.5);
   rect(0, -9, 48, 18, 5);
 
-  // Cincin Moncong Kuning Emas
+  // Cincin Moncong Emas
   fill(255, 193, 7);
   stroke(130, 95, 0);
   strokeWeight(2);
   rect(42, -10, 9, 20, 3);
 
-  // Tombol Drag Sudut di Ujung
+  // Tombol Pegangan Drag Sudut di Moncong
   fill(255, 235, 59);
   stroke(255);
   strokeWeight(1.5);
@@ -749,7 +786,7 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   drawingContext.setLineDash([]);
   pop();
 
-  // Busur Derajat Sudut
+  // Busur Derajat Sudut Elevasi
   push();
   noFill();
   stroke(255, 87, 34);
@@ -771,9 +808,9 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR BOLA KARAKTER & VEKTOR KECEPATAN
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 11: PENGGAMBARAN PROYEKTIL KARAKTER & PANAH VEKTOR KECEPATAN
+// =========================================================================================
 function drawCharacterProjectile(baseX, cannonY, ana) {
   let px = baseX;
   let py = cannonY;
@@ -793,7 +830,7 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
     currentV = proj.v;
   }
 
-  // Gambar Panah Vektor
+  // Gambar Panah Komponen Vektor Kecepatan Real-time
   if (showVectors && simState !== 'LANDED') {
     drawVelocityVectors(px, py, currentVx, currentVy, currentV);
   }
@@ -816,7 +853,7 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   noStroke();
   arc(0, 4, 16, 12, 0, PI);
 
-  // Mata Kartun Ekspresif
+  // Mata Kartun
   fill(255);
   stroke(40);
   strokeWeight(1);
@@ -829,13 +866,13 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   ellipse(5, -3, 3, 3);
   ellipse(-1, -3, 3, 3);
 
-  // Alis Hitam Galak
+  // Alis Hitam Tebal
   stroke(20);
   strokeWeight(2);
   line(-5, -8, 2, -6);
   line(2, -6, 8, -8);
 
-  // Paruh Kuning
+  // Paruh Segitiga Kuning
   fill(255, 179, 0);
   stroke(180, 110, 0);
   strokeWeight(1);
@@ -843,18 +880,21 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   pop();
 }
 
+/**
+ * Menggambar 3 vektor kecepatan: vx (horisontal), vy (vertikal), dan v (resultan)
+ */
 function drawVelocityVectors(px, py, vx, vy, v) {
   let scale = 1.35;
   let vxLen = vx * scale;
   let vyLen = -vy * scale;
 
-  // 1. Horisontal vx (Biru Cerah)
+  // 1. Vektor Horisontal vx (Biru Cerah - GLB Murni)
   drawArrow(px, py, px + vxLen, py, color(33, 150, 243), 'vₓ = ' + vx.toFixed(1), 2.2);
 
-  // 2. Vertikal vy (Hijau Segar)
+  // 2. Vektor Vertikal vy (Hijau Segar - GLBB Gravitasi)
   drawArrow(px, py, px, py + vyLen, color(76, 175, 80), 'vᵧ = ' + vy.toFixed(1), 2.2);
 
-  // 3. Resultan v (Oranye Terang)
+  // 3. Vektor Resultan v (Oranye Terang - Arah Garis Singgung Kurva)
   drawArrow(px, py, px + vxLen, py + vyLen, color(255, 111, 0), 'v = ' + v.toFixed(1), 2.8);
 }
 
@@ -868,6 +908,7 @@ function drawArrow(x1, y1, x2, y2, col, label, weight) {
   fill(col);
   line(x1, y1, x2, y2);
 
+  // Gambar kepala panah segitiga
   let angle = atan2(y2 - y1, x2 - x1);
   let arrowSize = 8;
   translate(x2, y2);
@@ -875,6 +916,7 @@ function drawArrow(x1, y1, x2, y2, col, label, weight) {
   triangle(0, 0, -arrowSize, -arrowSize * 0.45, -arrowSize, arrowSize * 0.45);
   pop();
 
+  // Label teks nilai kecepatan di dekat panah
   push();
   noStroke();
   fill(col);
@@ -888,28 +930,27 @@ function drawArrow(x1, y1, x2, y2, col, label, weight) {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR SASARAN TANTANGAN (ANGRY BIRDS TARGET PIG ON TOWER)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 12: PENGGAMBARAN SASARAN TANTANGAN (ANGRY BIRDS TARGET TOWER)
+// =========================================================================================
 function drawChallengeTarget() {
   push();
   let tPx = ORIGIN_X + target.x * meterToPixel;
   let tPy = GROUND_Y - target.y * meterToPixel;
 
-  // Menara Balok Kayu di Bawah Target
+  // Menara Balok Kayu Penopang Target
   fill(210, 140, 75);
   stroke(105, 55, 20);
   strokeWeight(2);
   rect(tPx - 14, tPy + 14, 28, GROUND_Y - (tPy + 14), 3);
 
-  // Tekstur Kotak Peti
   for (let by = tPy + 14; by < GROUND_Y - 10; by += 26) {
     line(tPx - 14, by, tPx + 14, by);
     line(tPx - 14, by, tPx + 14, by + 26);
     line(tPx - 14, by + 26, tPx + 14, by);
   }
 
-  // Jika Target Terkena Tembakan
+  // Jika Target Berhasil Dihancurkan
   if (target.isHit) {
     fill(255, 235, 59, 200);
     ellipse(tPx, tPy, 36, 36);
@@ -936,7 +977,7 @@ function drawChallengeTarget() {
   ellipse(tPx - 3, tPy + 2, 2.5, 3.5);
   ellipse(tPx + 3, tPy + 2, 2.5, 3.5);
 
-  // Mata Karakter Sasaran
+  // Mata Karakter
   fill(255);
   stroke(30);
   strokeWeight(1);
@@ -947,7 +988,7 @@ function drawChallengeTarget() {
   ellipse(tPx - 5, tPy - 4, 2.5, 2.5);
   ellipse(tPx + 5, tPy - 4, 2.5, 2.5);
 
-  // Lingkaran Bidik Target
+  // Garis Lingkaran Area Target (Hitbox)
   noFill();
   stroke(244, 67, 54, 180);
   strokeWeight(1.8);
@@ -955,7 +996,7 @@ function drawChallengeTarget() {
   ellipse(tPx, tPy, target.radius * meterToPixel * 2, target.radius * meterToPixel * 2);
   drawingContext.setLineDash([]);
 
-  // Label Target Jarak & Tinggi
+  // Label Koordinat Sasaran
   fill(255);
   stroke(105, 55, 20);
   strokeWeight(2);
@@ -971,9 +1012,9 @@ function drawChallengeTarget() {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// TITIK-TITIK SAMPEL LINTASAN (CLICKABLE INSPECTION NODES)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 13: TITIK-TITIK SAMPEL LINTASAN & KARTU INSPEKSI DATA (CLICK TO INSPECT)
+// =========================================================================================
 function drawSampledNodes() {
   hoveredNode = null;
   push();
@@ -989,19 +1030,19 @@ function drawSampledNodes() {
     let isSelected = (selectedNode === pt);
 
     if (isSelected) {
-      // Cincin emas berdenyut untuk titik terpilih
+      // Cincin emas berdenyut pada titik yang dipilih
       noFill();
       stroke(255, 193, 7);
       strokeWeight(3);
       ellipse(px, py, 16 + sin(frameCount * 0.15) * 4, 16 + sin(frameCount * 0.15) * 4);
 
-      // Gambar mini vektor pada titik inspeksi
+      // Gambar mini panah vektor pada titik terpilih
       drawArrow(px, py, px + pt.vx * 0.9, py, color(33, 150, 243), '', 2);
       drawArrow(px, py, px, py - pt.vy * 0.9, color(76, 175, 80), '', 2);
       drawArrow(px, py, px + pt.vx * 0.9, py - pt.vy * 0.9, color(255, 111, 0), '', 2.4);
     }
 
-    // Titik Sampel Lingkaran
+    // Titik Sampel Lingkaran Kuning
     fill(isSelected ? '#ff9800' : (isHover ? '#ffffff' : '#ffd54f'));
     stroke(isSelected ? '#ffffff' : (isHover ? '#ff5722' : '#bf360c'));
     strokeWeight(isHover || isSelected ? 2.5 : 1.5);
@@ -1010,32 +1051,31 @@ function drawSampledNodes() {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// KARTU DETAIL INSPEKSI TITIK (POPUP DIALOG CALLOUT)
-// ----------------------------------------------------------------------------
+/**
+ * Menampilkan kartu dialog melayang (pop-up callout) berisi rincian telemetri titik yang diklik
+ */
 function drawNodeInspectorCard(node) {
   push();
   let px = ORIGIN_X + node.x * meterToPixel;
   let py = GROUND_Y - node.y * meterToPixel;
 
-  // Letak kartu di atas titik
   let cardW = 220;
   let cardH = 135;
   let cardX = constrain(px - cardW / 2, 25, width - cardW - 25);
   let cardY = constrain(py - cardH - 20, 25, GROUND_Y - cardH - 10);
 
-  // Segitiga Penunjuk (Callout Pointer)
+  // Segitiga penunjuk kartu ke arah titik
   fill(255);
   noStroke();
   triangle(px, py - 4, px - 8, cardY + cardH, px + 8, cardY + cardH);
 
-  // Background Kartu Bersih Modern
+  // Background kartu pop-up
   fill(255);
   stroke(255, 152, 0);
   strokeWeight(2.5);
   rect(cardX, cardY, cardW, cardH, 10);
 
-  // Header Kartu
+  // Header kartu
   fill(255, 152, 0);
   noStroke();
   rect(cardX, cardY, cardW, 26, 10, 10, 0, 0);
@@ -1046,13 +1086,13 @@ function drawNodeInspectorCard(node) {
   textAlign(LEFT, CENTER);
   text('🔍 DETAIL FISIKA TITIK LINTASAN', cardX + 10, cardY + 13);
 
-  // Tombol Tutup [X]
+  // Tombol [X] Tutup
   fill(255);
   textAlign(RIGHT, CENTER);
   text('✕', cardX + cardW - 10, cardY + 13);
   textStyle(NORMAL);
 
-  // Baris Data Telemetri Titik
+  // Baris informasi data fisika
   let sy = cardY + 38;
   let lh = 17;
 
@@ -1079,9 +1119,9 @@ function drawInspectorRow(label, val, valColor, x, y) {
   textStyle(NORMAL);
 }
 
-// ----------------------------------------------------------------------------
-// GAMBAR JEJAK LINTASAN & PREVIEW
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 14: LINTASAN TEORETIS & PENANDA TITIK KUNCI (Hmax & Rmax)
+// =========================================================================================
 function drawTheoreticalPath(v_init, deg, y0, g_acc, t_total) {
   if (t_total <= 0) return;
   push();
@@ -1145,7 +1185,7 @@ function drawMarkers(ana) {
   let landPx = ORIGIN_X + ana.Rmax * meterToPixel;
   let landPy = GROUND_Y;
 
-  // Hmax Marker
+  // Penanda Titik Tertinggi (Hmax)
   if (ana.Hmax > 0.5) {
     stroke(255, 193, 7);
     strokeWeight(1.5);
@@ -1173,7 +1213,7 @@ function drawMarkers(ana) {
     textStyle(NORMAL);
   }
 
-  // Rmax Marker (Bendera Merah)
+  // Penanda Jangkauan Terjauh (Rmax) - Bendera Merah
   if (ana.Rmax > 1.0) {
     stroke(229, 57, 53);
     strokeWeight(2);
@@ -1200,9 +1240,9 @@ function drawMarkers(ana) {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// EFEK PARTIKEL CERAH (KONFETI & ASAP)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 15: EFEK PARTIKEL VISUAL (KONFETI, ASAP, DEBU PENDARATAN)
+// =========================================================================================
 function createVictoryConfetti(x, y) {
   let colors = ['#f44336', '#e91e63', '#9c27b0', '#2196f3', '#4caf50', '#ffeb3b', '#ff9800'];
   for (let i = 0; i < 45; i++) {
@@ -1263,7 +1303,7 @@ function updateParticles() {
     let c = confetti[i];
     c.x += c.vx;
     c.y += c.vy;
-    c.vy += 0.35; // Gravitasi konfeti
+    c.vy += 0.35;
     c.rot += c.vRot;
     c.alpha -= 3;
     if (c.alpha <= 0 || c.y > height) confetti.splice(i, 1);
@@ -1290,9 +1330,9 @@ function drawParticles() {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// PANEL TELEMETRI REAL-TIME CERAH
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 16: PANEL TELEMETRI REAL-TIME & PAPAN MISI TANTANGAN
+// =========================================================================================
 function drawTelemetryOverlay(ana) {
   push();
   let boxX = width - 305;
@@ -1315,7 +1355,7 @@ function drawTelemetryOverlay(ana) {
   textAlign(LEFT, CENTER);
   text('📊 TELEMETRI FISIKA', boxX + 12, boxY + 14);
 
-  // Status Badge
+  // Lencana status peluru
   let statusText = (simState === 'FLYING') ? 'MELAYANG' : (simState === 'LANDED' ? 'MENDARAT' : 'SIAP TEMBAK');
   let statusBg = (simState === 'FLYING') ? '#4caf50' : (simState === 'LANDED' ? '#e53935' : '#2196f3');
   fill(statusBg);
@@ -1360,9 +1400,6 @@ function drawWhiteDataRow(label, val, valColor, x, y) {
   textStyle(NORMAL);
 }
 
-// ----------------------------------------------------------------------------
-// BANNER SKOR TANTANGAN (ANGRY BIRDS CHALLENGE)
-// ----------------------------------------------------------------------------
 function drawChallengeBanner() {
   push();
   let banX = 30;
@@ -1388,51 +1425,46 @@ function drawChallengeBanner() {
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// PANEL KONTROL BAWAH (WARNA CERAH RAMAH PENGGUNA)
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 17: PANEL KONTROL UI BAWAH (SLIDER & TOMBOL BERSIH TANPA PRESET)
+// =========================================================================================
 function drawControlInterface() {
   push();
-  fill(255, 255, 255, 245);
+  // Wadah panel kontrol bawah
+  fill(255, 255, 255, 248);
   stroke(203, 213, 225);
   strokeWeight(1.5);
-  rect(30, 495, width - 60, 218, 12);
+  rect(30, 502, width - 60, 202, 12);
 
-  fill(71, 85, 105);
+  // Header teks panel kontrol
+  fill(51, 65, 85);
   noStroke();
-  textSize(10.5);
+  textSize(11);
   textStyle(BOLD);
   textAlign(LEFT, CENTER);
-  text('🎛 KONTROL:', 42, 523);
-  text('📐 PRESET SUDUT:', 170, 523);
-  text('🏔 TINGGI h₀:', 440, 523);
-  text('🌍 GRAVITASI:', 680, 523);
+  text('🎛 PENGATUR PARAMETER FISIKA', 45, 522);
+
+  fill(100, 116, 139);
+  textSize(9.5);
   textStyle(NORMAL);
+  textAlign(RIGHT, CENTER);
+  text('💡 Tips: Anda juga bisa langsung menyeret laras meriam (sudut) & tebing (ketinggian) dengan mouse!', width - 45, 522);
 
-  for (let pb of presetButtons) {
-    let isHover = mouseX >= pb.x && mouseX <= pb.x + pb.w && mouseY >= pb.y && mouseY <= pb.y + pb.h;
-    fill(isHover ? '#ffeb3b' : '#f8fafc');
-    stroke(isHover ? '#f57c00' : '#cbd5e1');
-    strokeWeight(1);
-    rect(pb.x, pb.y, pb.w, pb.h, 4);
-
-    fill(51, 65, 85);
-    noStroke();
-    textSize(8.5);
-    textStyle(BOLD);
-    textAlign(CENTER, CENTER);
-    text(pb.label, pb.x + pb.w / 2, pb.y + pb.h / 2);
-    textStyle(NORMAL);
+  // Gambar semua slider
+  for (let key in sliders) {
+    sliders[key].draw();
   }
 
-  for (let key in sliders) sliders[key].draw();
-  for (let btn of buttons) btn.draw();
+  // Gambar semua tombol aksi
+  for (let btn of buttons) {
+    btn.draw();
+  }
   pop();
 }
 
-// ----------------------------------------------------------------------------
-// KELAS KOMPONEN UI CANVAS: SLIDER CERAH
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 18: KELAS KOMPONEN UI CANVAS (SLIDER & BUTTON)
+// =========================================================================================
 class CartoonSlider {
   constructor(x, y, w, minVal, maxVal, defaultVal, label, unit, step, themeColor) {
     this.x = x;
@@ -1463,19 +1495,19 @@ class CartoonSlider {
     text(valStr + ' ' + this.unit, this.x + this.w, this.y - 7);
     textStyle(NORMAL);
 
-    // Rel Belakang
+    // Rel lintasan belakang
     stroke(226, 232, 240);
     strokeWeight(7);
     strokeCap(ROUND);
     line(this.x, this.y + 6, this.x + this.w, this.y + 6);
 
-    // Rel Aktif Berwarna
+    // Rel lintasan aktif berwarna
     let handleX = map(this.value, this.minVal, this.maxVal, this.x, this.x + this.w);
     stroke(this.themeColor);
     strokeWeight(7);
     line(this.x, this.y + 6, handleX, this.y + 6);
 
-    // Handle Bulat Menawan
+    // Tombol bulat handle slider
     fill(255);
     stroke(this.themeColor);
     strokeWeight(3);
@@ -1512,9 +1544,6 @@ class CartoonSlider {
   }
 }
 
-// ----------------------------------------------------------------------------
-// KELAS KOMPONEN UI CANVAS: BUTTON CERAH
-// ----------------------------------------------------------------------------
 class CartoonButton {
   constructor(x, y, w, h, label, baseColor, hoverColor, onClick) {
     this.x = x;
@@ -1531,11 +1560,12 @@ class CartoonButton {
     push();
     let isHover = mouseX >= this.x && mouseX <= this.x + this.w && mouseY >= this.y && mouseY <= this.y + this.h;
 
-    // Drop shadow tipis kartun
+    // Bayangan lembut
     fill(0, 0, 0, 25);
     noStroke();
     rect(this.x + 2, this.y + 2, this.w, this.h, 6);
 
+    // Kotak tombol
     fill(isHover ? this.hoverColor : this.baseColor);
     stroke(255);
     strokeWeight(1.2);
@@ -1559,36 +1589,33 @@ class CartoonButton {
   }
 }
 
-// ----------------------------------------------------------------------------
-// KONTROL KURSOR MOUSE
-// ----------------------------------------------------------------------------
+// =========================================================================================
+// BAGIAN 19: PENANGANAN INTERAKSI MOUSE (MOUSE LISTENERS)
+// =========================================================================================
 function updateMouseCursor(cannonY) {
   let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
   let isNearCannon = (dCannon < 75 && mouseX >= ORIGIN_X - 10 && simState === 'IDLE');
   let isNearPlatform = (h0 > 0 && mouseX >= 25 && mouseX <= ORIGIN_X + 25 && mouseY >= cannonY - 15 && mouseY <= cannonY + 15 && simState === 'IDLE');
 
   if (hoveredNode) {
-    cursor('pointer'); // Hovering di atas titik inspeksi lintasan
+    cursor('pointer'); // Hovering di atas titik sampel lintasan
   } else if (isAimingCannon) {
-    cursor('crosshair');
+    cursor('crosshair'); // Sedang membidik laras meriam
   } else if (isDraggingPlatform) {
-    cursor('ns-resize');
+    cursor('ns-resize'); // Sedang mengatur tinggi tebing
   } else if (isNearCannon) {
-    cursor('grab');
+    cursor('grab'); // Bisa menarik meriam
   } else if (isNearPlatform) {
-    cursor('ns-resize');
+    cursor('ns-resize'); // Bisa menarik tebing
   } else {
     cursor(ARROW);
   }
 }
 
-// ----------------------------------------------------------------------------
-// EVENT LISTENER MOUSE
-// ----------------------------------------------------------------------------
 function mousePressed() {
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
-  // 1. Cek Klik pada Titik Sampel Lintasan (Point Inspection)
+  // 1. Cek Apakah Pengguna Mengklik Salah Satu Titik Sampel Lintasan
   for (let pt of sampledNodes) {
     let px = ORIGIN_X + pt.x * meterToPixel;
     let py = GROUND_Y - pt.y * meterToPixel;
@@ -1598,7 +1625,7 @@ function mousePressed() {
     }
   }
 
-  // Cek Tombol Tutup Kartu Inspeksi
+  // 2. Cek Tombol [X] Tutup pada Kartu Inspeksi Data
   if (selectedNode) {
     let cardW = 220;
     let cardH = 135;
@@ -1606,14 +1633,13 @@ function mousePressed() {
     let py = GROUND_Y - selectedNode.y * meterToPixel;
     let cardX = constrain(px - cardW / 2, 25, width - cardW - 25);
     let cardY = constrain(py - cardH - 20, 25, GROUND_Y - cardH - 10);
-    // Klik di area [X] pojok kanan atas kartu
     if (mouseX >= cardX + cardW - 25 && mouseX <= cardX + cardW && mouseY >= cardY && mouseY <= cardY + 25) {
       selectedNode = null;
       return;
     }
   }
 
-  // 2. Cek Drag Meriam untuk ubah sudut
+  // 3. Cek Drag Interaktif Meriam untuk Mengubah Sudut
   if (simState === 'IDLE') {
     let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
     if (dCannon < 80 && mouseX >= ORIGIN_X - 15) {
@@ -1622,7 +1648,7 @@ function mousePressed() {
       return;
     }
 
-    // 3. Cek Drag Platform untuk ubah tinggi awal
+    // 4. Cek Drag Interaktif Platform untuk Mengubah Ketinggian Awal (h0)
     if (mouseX >= 25 && mouseX <= ORIGIN_X + 30 && Math.abs(mouseY - cannonY) < 20) {
       isDraggingPlatform = true;
       updateHeightFromMouse();
@@ -1630,49 +1656,33 @@ function mousePressed() {
     }
   }
 
-  // 4. Cek Sliders
+  // 5. Cek Slider Pengatur
   for (let key in sliders) {
     if (sliders[key].checkMousePressed(mouseX, mouseY)) return;
   }
 
-  // 5. Cek Tombol Aksi
+  // 6. Cek Tombol Aksi
   for (let btn of buttons) {
     if (btn.checkClick(mouseX, mouseY)) return;
-  }
-
-  // 6. Cek Preset
-  for (let pb of presetButtons) {
-    if (mouseX >= pb.x && mouseX <= pb.x + pb.w && mouseY >= pb.y && mouseY <= pb.y + pb.h) {
-      if (pb.g !== undefined) {
-        sliders.gravity.value = pb.g;
-        gravity = pb.g;
-      }
-      if (pb.a !== undefined) {
-        sliders.angle.value = pb.a;
-        angleDeg = pb.a;
-      }
-      if (pb.h !== undefined) {
-        sliders.h0.value = pb.h;
-        h0 = pb.h;
-      }
-      return;
-    }
   }
 }
 
 function mouseDragged() {
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
+  // Jika sedang menyeret laras meriam
   if (isAimingCannon) {
     updateAngleFromMouse(cannonY);
     return;
   }
 
+  // Jika sedang menyeret tinggi platform tebing
   if (isDraggingPlatform) {
     updateHeightFromMouse();
     return;
   }
 
+  // Jika sedang menggeser slider
   for (let key in sliders) {
     if (sliders[key].isDragging) {
       sliders[key].updateFromMouse(mouseX);
@@ -1689,15 +1699,21 @@ function mouseReleased() {
   }
 }
 
+/**
+ * Menghitung sudut elevasi tembakan dari posisi kursor mouse terhadap pangkal meriam
+ */
 function updateAngleFromMouse(cannonY) {
   let dx = mouseX - ORIGIN_X;
-  let dy = cannonY - mouseY;
+  let dy = cannonY - mouseY; // Sumbu Y kanvas terbalik (ke atas = nilai y mengecil)
   let deg = degrees(Math.atan2(dy, dx));
   deg = constrain(Math.round(deg), 0, 90);
   sliders.angle.value = deg;
   angleDeg = deg;
 }
 
+/**
+ * Menghitung ketinggian awal peluncur (h0) dari pergerakan mouse vertikal
+ */
 function updateHeightFromMouse() {
   let pixelH = GROUND_Y - mouseY;
   let mHeight = pixelH / meterToPixel;
