@@ -537,7 +537,7 @@ function drawMeterRuler(Rmax, Hmax) {
     textSize(10);
     textStyle(BOLD);
     textAlign(CENTER, TOP);
-    text(m + 'm', px, GROUND_Y + 16);
+    text(m + 'm', px, GROUND_Y + 7);
     textStyle(NORMAL);
   }
 
@@ -1044,41 +1044,60 @@ function drawMarkers(ana) {
     strokeWeight(2);
     ellipse(peakPx, peakPy, 11, 11);
 
+    let hBadgeW = 86;
+    let hBadgeH = 18;
+    let hBadgeX = constrain(peakPx, hBadgeW / 2 + 15, width - hBadgeW / 2 - 15);
+    let hBadgeY = Math.max(30, peakPy - 24);
+
     fill(255, 248, 225);
     stroke(190, 130, 0);
     strokeWeight(1.5);
-    rect(peakPx - 42, peakPy - 24, 84, 18, 4);
+    rect(hBadgeX - hBadgeW / 2, hBadgeY, hBadgeW, hBadgeH, 4);
 
     noStroke();
     fill(130, 75, 0);
     textSize(9.5);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Hₘₐₖₛ: ' + ana.Hmax.toFixed(1) + 'm', peakPx, peakPy - 15);
+    text('Hₘₐₖₛ: ' + ana.Hmax.toFixed(1) + 'm', hBadgeX, hBadgeY + hBadgeH / 2);
     textStyle(NORMAL);
   }
 
   if (ana.Rmax > 1.0) {
+    // Tiang bendera dan bendera penanda pendaratan
     stroke(229, 57, 53);
-    strokeWeight(2);
-    line(landPx, landPy, landPx, landPy - 20);
+    strokeWeight(2.5);
+    line(landPx, landPy, landPx, landPy - 26);
 
     fill(229, 57, 53);
     noStroke();
-    triangle(landPx, landPy - 20, landPx, landPy - 10, landPx + 15, landPy - 15);
-    ellipse(landPx, landPy, 8, 8);
+    triangle(landPx, landPy - 26, landPx, landPy - 14, landPx + 16, landPy - 20);
+    ellipse(landPx, landPy, 9, 9);
 
+    // Badge label R_maks diposisikan di ATAS bendera agar tidak tertutup panel kontrol bawah
+    let badgeW = 90;
+    let badgeH = 20;
+    let badgeX = constrain(landPx, badgeW / 2 + 15, width - badgeW / 2 - 15);
+    let badgeY = landPy - 52;
+
+    // Garis sambung tipis dari bendera ke badge penanda
+    stroke(229, 57, 53, 160);
+    strokeWeight(1);
+    line(landPx, landPy - 26, badgeX, badgeY + badgeH);
+
+    // Kotak badge R_maks yang cerah dan kontras tinggi
     fill(255, 235, 238);
     stroke(198, 40, 40);
     strokeWeight(1.5);
-    rect(landPx - 42, landPy + 16, 84, 18, 4);
+    rect(badgeX - badgeW / 2, badgeY, badgeW, badgeH, 5);
 
+    // Teks R_maks (Jangkauan Maksimum / Radius)
     noStroke();
     fill(198, 40, 40);
-    textSize(9.5);
+    textSize(10);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Rₘₐₖₛ: ' + ana.Rmax.toFixed(1) + 'm', landPx, landPy + 25);
+    text('Rₘₐₖₛ: ' + ana.Rmax.toFixed(1) + 'm', badgeX, badgeY + badgeH / 2);
     textStyle(NORMAL);
   }
   pop();
