@@ -140,28 +140,19 @@ function setup() {
   // Inisialisasi 4 Slider Parameter Fisika (Posisi Presisi & Proporsional)
   // Format: CartoonSlider(x, y, lebar, minVal, maxVal, nilaiAwal, label, satuan, step, warna)
   // ---------------------------------------------------------------------------------------
-  // Slider 1: Kecepatan Awal (v0)
   sliders.v0 = new CartoonSlider(45, 544, 215, 10, 100, v0, 'Kecepatan Awal (v₀)', 'm/s', 1, '#ff5722');
-
-  // Slider 2: Sudut Elevasi (theta)
   sliders.angle = new CartoonSlider(290, 544, 215, 0, 90, angleDeg, 'Sudut Elevasi (θ)', '°', 1, '#ff9800');
-
-  // Slider 3: Ketinggian Awal (h0)
   sliders.h0 = new CartoonSlider(535, 544, 215, 0, 50, h0, 'Ketinggian Awal (h₀)', 'm', 1, '#4caf50');
-
-  // Slider 4: Percepatan Gravitasi (g)
   sliders.gravity = new CartoonSlider(780, 544, 215, 1.0, 20.0, gravity, 'Percepatan Gravitasi (g)', 'm/s²', 0.1, '#00bcd4');
 
   // ---------------------------------------------------------------------------------------
   // Inisialisasi Tombol Kontrol Aksi Utama (Langsung di bawah Slider secara Proporsional)
   // Format: CartoonButton(x, y, lebar, tinggi, label, warnaDasar, warnaHover, fungsiAksi)
   // ---------------------------------------------------------------------------------------
-  // Tombol 1: Tembak Proyektil
   buttons.push(new CartoonButton(45, 598, 130, 38, '🚀 TEMBAK!', '#4caf50', '#388e3c', () => {
     fireProjectile();
   }));
 
-  // Tombol 2: Jeda / Lanjutkan Animasi
   buttons.push(new CartoonButton(186, 598, 115, 38, '⏸ JEDA', '#2196f3', '#1976d2', function() {
     if (simState === 'FLYING') {
       simState = 'PAUSED';
@@ -176,17 +167,14 @@ function setup() {
     }
   }));
 
-  // Tombol 3: Reset Posisi ke Titik Awal
   buttons.push(new CartoonButton(312, 598, 105, 38, '🔄 RESET', '#f44336', '#d32f2f', () => {
     resetSimulation();
   }));
 
-  // Tombol 4: Acak Posisi Sasaran Tantangan Baru
   buttons.push(new CartoonButton(428, 598, 140, 38, '🎯 TARGET BARU', '#9c27b0', '#7b1fa2', () => {
     randomizeTarget();
   }));
 
-  // Tombol 5: Pengatur Laju Kecepatan Simulasi (Slow-Mo)
   buttons.push(new CartoonButton(579, 598, 125, 38, '⏱ Laju: 1.0x', '#607d8b', '#455a64', function() {
     if (simSpeed === 1.0) {
       simSpeed = 0.5;
@@ -200,13 +188,11 @@ function setup() {
     }
   }));
 
-  // Tombol 6: Toggle Visibilitas Panah Vektor Kecepatan
   buttons.push(new CartoonButton(715, 598, 125, 38, '🏹 Vektor: ON', '#3f51b5', '#303f9f', function() {
     showVectors = !showVectors;
     this.label = showVectors ? '🏹 Vektor: ON' : '🏹 Vektor: OFF';
   }));
 
-  // Tombol 7: Bersihkan Jejak & Titik Inspeksi
   buttons.push(new CartoonButton(851, 598, 145, 38, '🧹 Hapus Titik', '#78909c', '#546e7a', () => {
     pastTrails = [];
     currentTrail = [];
@@ -219,10 +205,8 @@ function setup() {
 // BAGIAN 3: DRAW LOOP UTAMA (DIULANG ~60 KALI PER DETIK)
 // =========================================================================================
 function draw() {
-  // 1. Gambar Langit Biru, Matahari Cerah, Awan Bergerak, dan Perbukitan Hijau
   drawCartoonEnvironment();
 
-  // 2. Baca Nilai Parameter dari Slider (bila proyektil sedang diam/idle)
   if (simState === 'IDLE') {
     v0 = sliders.v0.value;
     angleDeg = sliders.angle.value;
@@ -232,108 +216,68 @@ function draw() {
     proj.y = h0;
   }
 
-  // 3. Lakukan Perhitungan Analitis Lengkap & Sesuaikan Skala Tampilan
   let ana = calculateAnalytical(v0, angleDeg, h0, gravity);
   updateScale(ana.Rmax, ana.Hmax);
 
-  // 4. Update Posisi Fisika Numerik Proyektil (bila sedang melayang)
   if (simState === 'FLYING') {
     updatePhysics(ana);
   }
 
-  // 5. Update Partikel Animasi (Asap, Percikan Tanah, dan Konfeti Kemenangan)
   updateParticles();
-
-  // 6. Gambar Garis Penggaris Ukur Satuan Meter (Grid Pengukuran)
   drawMeterRuler(ana.Rmax, ana.Hmax);
 
-  // 7. Gambar Platform / Menara Tebing Ketinggian Awal (h0)
   let cannonY = GROUND_Y - h0 * meterToPixel;
   drawWoodenPlatform(ORIGIN_X, GROUND_Y, cannonY, h0);
 
-  // 8. Gambar Lintasan Putus-Putus Preview Teoretis
   if (showTheoreticalPath) {
     drawTheoreticalPath(v0, angleDeg, h0, gravity, ana.tTotal);
   }
 
-  // 9. Gambar Jejak Tembakan Sebelumnya & Jejak Tembakan Aktif
   if (showTrail) {
     drawPastTrails();
     drawCurrentTrail();
   }
 
-  // 10. Gambar Titik-Titik Sampel Lintasan (Bisa Diklik untuk Diinspeksi)
   drawSampledNodes();
-
-  // 11. Gambar Sasaran Menara Karakter (Target Tantangan)
   drawChallengeTarget();
 
-  // 12. Gambar Marker Titik Tertinggi (Hmax) dan Jarak Terjauh (Rmax)
   if (showMarkers) {
     drawMarkers(ana);
   }
 
-  // 13. Gambar Peluncur Meriam Kayu (Bisa Ditarik Langsung untuk Mengubah Sudut)
   drawCartoonLauncher(ORIGIN_X, cannonY, angleDeg);
-
-  // 14. Gambar Proyektil Karakter Burung Merah & Vektor Kecepatannya
   drawCharacterProjectile(ORIGIN_X, cannonY, ana);
-
-  // 15. Gambar Partikel Visual di Layar
   drawParticles();
 
-  // 16. Gambar Kartu Pop-up Telemetri Detail Titik yang Diklik (Jika Ada)
   if (selectedNode) {
     drawNodeInspectorCard(selectedNode);
   }
 
-  // 17. Gambar Panel Telemetri Real-Time & Papan Misi Tantangan
   drawTelemetryOverlay(ana);
   drawChallengeBanner();
-
-  // 18. Gambar Panel Kontrol Slider & Tombol di Bagian Bawah (Lebih Rapat & Proporsional)
   drawControlInterface();
-
-  // 19. Perbarui Bentuk Kursor Mouse Berdasarkan Area Interaksi
   updateMouseCursor(cannonY);
 }
 
 // =========================================================================================
 // BAGIAN 4: KALKULASI ANALITIS FISIKA IDEAL
 // =========================================================================================
-/**
- * Menghitung seluruh besaran fisik gerak parabola secara analitis berdasarkan rumus fisika murni.
- * @param {number} v_init - Kecepatan awal proyektil (m/s)
- * @param {number} deg - Sudut elevasi tembakan (derajat)
- * @param {number} y0 - Ketinggian awal peluncur dari tanah (meter)
- * @param {number} g_acc - Percepatan gravitasi (m/s^2)
- * @returns {object} Kumpulan parameter analitis terhitung
- */
 function calculateAnalytical(v_init, deg, y0, g_acc) {
   let rad = radians(deg);
   let v0x = v_init * Math.cos(rad);
   let v0y = v_init * Math.sin(rad);
 
-  // Waktu mencapai titik puncak (vy = 0)
   let tPeak = (g_acc > 0 && v0y > 0) ? (v0y / g_acc) : 0;
-
-  // Tinggi maksimum diukur dari tanah (Hmax = y0 + v0y^2 / 2g)
   let Hmax = (g_acc > 0 && v0y > 0) ? (y0 + (v0y * v0y) / (2 * g_acc)) : y0;
-
-  // Jarak horizontal saat berada di titik puncak
   let xPeak = v0x * tPeak;
 
-  // Waktu total melayang di udara sampai menyentuh tanah (y = 0)
   let discriminant = v0y * v0y + 2 * g_acc * y0;
   let tTotal = 0;
   if (g_acc > 0 && discriminant >= 0) {
     tTotal = (v0y + Math.sqrt(discriminant)) / g_acc;
   }
 
-  // Jangkauan horizontal maksimum (Rmax = vx * t_total)
   let Rmax = v0x * tTotal;
-
-  // Kelajuan akhir sesaat sebelum menyentuh tanah (Hukum Kekekalan Energi)
   let vLand = Math.sqrt(v_init * v_init + 2 * g_acc * y0);
 
   return { rad, v0x, v0y, tPeak, Hmax, tTotal, Rmax, xPeak, vLand };
@@ -869,6 +813,7 @@ function drawChallengeTarget() {
   }
 
   if (target.isHit) {
+    noStroke();
     fill(255, 235, 59, 200);
     ellipse(tPx, tPy, 36, 36);
     fill(255, 87, 34);
@@ -1235,7 +1180,7 @@ function drawParticles() {
 function drawTelemetryOverlay(ana) {
   push();
   let boxX = width - 305;
-  let boxY = 25;
+  let boxY = 22;
   let boxW = 275;
   let boxH = 220;
 
@@ -1298,28 +1243,37 @@ function drawWhiteDataRow(label, val, valColor, x, y) {
   textStyle(NORMAL);
 }
 
+// -----------------------------------------------------------------------------------------
+// PAPAN MISI TANTANGAN SASARAN (TULISAN TAJAM, BERSIH, TANPA EFEK STROKE)
+// -----------------------------------------------------------------------------------------
 function drawChallengeBanner() {
   push();
   let banX = 30;
-  let banY = 25;
-  let banW = 270;
-  let banH = 46;
+  let banY = 22;
+  let banW = 295;
+  let banH = 54;
 
-  fill(255, 255, 255, 240);
+  // Background box putih bersih dengan border halus
+  fill(255, 255, 255, 248);
   stroke(76, 175, 80);
   strokeWeight(2);
-  rect(banX, banY, banW, banH, 8);
+  rect(banX, banY, banW, banH, 10);
 
-  fill(76, 175, 80);
-  textSize(11);
+  // noStroke() mutlak dipanggil agar tulisan teks tajam dan tidak terkena stroke tebal
+  noStroke();
+
+  // Judul: Huruf tajam, kontras tinggi, dan berjarak lega
+  fill(46, 125, 50);
+  textSize(11.5);
   textStyle(BOLD);
   textAlign(LEFT, TOP);
-  text('🎯 MISI TANTANGAN SASARAN:', banX + 10, banY + 8);
+  text('🎯 MISI TANTANGAN SASARAN', banX + 14, banY + 10);
 
-  fill(55, 65, 81);
-  textSize(9.5);
+  // Keterangan target dan skor: Spasi lega & mudah dibaca
+  fill(30, 41, 59);
+  textSize(10.5);
   textStyle(NORMAL);
-  text(`Target di X: ${target.x}m, Y: ${target.y}m | Skor: ${target.score}`, banX + 10, banY + 26);
+  text(`Target: X = ${target.x}m, Y = ${target.y}m   |   Skor: ${target.score}`, banX + 14, banY + 29);
   pop();
 }
 
@@ -1328,13 +1282,11 @@ function drawChallengeBanner() {
 // =========================================================================================
 function drawControlInterface() {
   push();
-  // Wadah panel kontrol bawah (tinggi 154px yang padat dan proporsional)
   fill(255, 255, 255, 248);
   stroke(203, 213, 225);
   strokeWeight(1.5);
   rect(30, 498, width - 60, 154, 12);
 
-  // Header teks panel kontrol
   fill(51, 65, 85);
   noStroke();
   textSize(11);
@@ -1348,12 +1300,10 @@ function drawControlInterface() {
   textAlign(RIGHT, CENTER);
   text('💡 Tips: Anda juga bisa langsung menyeret laras meriam (sudut) & tebing (ketinggian) dengan mouse!', width - 45, 517);
 
-  // Gambar semua slider
   for (let key in sliders) {
     sliders[key].draw();
   }
 
-  // Gambar semua tombol aksi
   for (let btn of buttons) {
     btn.draw();
   }
@@ -1393,19 +1343,16 @@ class CartoonSlider {
     text(valStr + ' ' + this.unit, this.x + this.w, this.y - 7);
     textStyle(NORMAL);
 
-    // Rel lintasan belakang
     stroke(226, 232, 240);
     strokeWeight(7);
     strokeCap(ROUND);
     line(this.x, this.y + 6, this.x + this.w, this.y + 6);
 
-    // Rel lintasan aktif berwarna
     let handleX = map(this.value, this.minVal, this.maxVal, this.x, this.x + this.w);
     stroke(this.themeColor);
     strokeWeight(7);
     line(this.x, this.y + 6, handleX, this.y + 6);
 
-    // Tombol bulat handle slider
     fill(255);
     stroke(this.themeColor);
     strokeWeight(3);
@@ -1458,12 +1405,10 @@ class CartoonButton {
     push();
     let isHover = mouseX >= this.x && mouseX <= this.x + this.w && mouseY >= this.y && mouseY <= this.y + this.h;
 
-    // Bayangan lembut
     fill(0, 0, 0, 25);
     noStroke();
     rect(this.x + 2, this.y + 2, this.w, this.h, 6);
 
-    // Kotak tombol
     fill(isHover ? this.hoverColor : this.baseColor);
     stroke(255);
     strokeWeight(1.2);
@@ -1496,15 +1441,15 @@ function updateMouseCursor(cannonY) {
   let isNearPlatform = (h0 > 0 && mouseX >= 25 && mouseX <= ORIGIN_X + 25 && mouseY >= cannonY - 15 && mouseY <= cannonY + 15 && simState === 'IDLE');
 
   if (hoveredNode) {
-    cursor('pointer'); // Hovering di atas titik sampel lintasan
+    cursor('pointer');
   } else if (isAimingCannon) {
-    cursor('crosshair'); // Sedang membidik laras meriam
+    cursor('crosshair');
   } else if (isDraggingPlatform) {
-    cursor('ns-resize'); // Sedang mengatur tinggi tebing
+    cursor('ns-resize');
   } else if (isNearCannon) {
-    cursor('grab'); // Bisa menarik meriam
+    cursor('grab');
   } else if (isNearPlatform) {
-    cursor('ns-resize'); // Bisa menarik tebing
+    cursor('ns-resize');
   } else {
     cursor(ARROW);
   }
@@ -1513,7 +1458,6 @@ function updateMouseCursor(cannonY) {
 function mousePressed() {
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
-  // 1. Cek Apakah Pengguna Mengklik Salah Satu Titik Sampel Lintasan
   for (let pt of sampledNodes) {
     let px = ORIGIN_X + pt.x * meterToPixel;
     let py = GROUND_Y - pt.y * meterToPixel;
@@ -1523,7 +1467,6 @@ function mousePressed() {
     }
   }
 
-  // 2. Cek Tombol [X] Tutup pada Kartu Inspeksi Data
   if (selectedNode) {
     let cardW = 220;
     let cardH = 135;
@@ -1537,7 +1480,6 @@ function mousePressed() {
     }
   }
 
-  // 3. Cek Drag Interaktif Meriam untuk Mengubah Sudut
   if (simState === 'IDLE') {
     let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
     if (dCannon < 80 && mouseX >= ORIGIN_X - 15) {
@@ -1546,7 +1488,6 @@ function mousePressed() {
       return;
     }
 
-    // 4. Cek Drag Interaktif Platform untuk Mengubah Ketinggian Awal (h0)
     if (mouseX >= 25 && mouseX <= ORIGIN_X + 30 && Math.abs(mouseY - cannonY) < 20) {
       isDraggingPlatform = true;
       updateHeightFromMouse();
@@ -1554,12 +1495,10 @@ function mousePressed() {
     }
   }
 
-  // 5. Cek Slider Pengatur
   for (let key in sliders) {
     if (sliders[key].checkMousePressed(mouseX, mouseY)) return;
   }
 
-  // 6. Cek Tombol Aksi
   for (let btn of buttons) {
     if (btn.checkClick(mouseX, mouseY)) return;
   }
