@@ -59,8 +59,8 @@ Gerak parabola tanpa hambatan udara merupakan perpaduan dua gerak yang saling be
    $$H_{\max} = h_0 + \frac{(v_0 \sin\theta)^2}{2g}$$
 3. **Waktu Total di Udara ($t_{\text{total}}$):**
    $$t_{\text{total}} = \frac{v_0 \sin\theta + \sqrt{(v_0 \sin\theta)^2 + 2 g h_0}}{g}$$
-4. **Jarak Jangkauan Terjauh ($R_{\max}$):**
-   $$R_{\max} = v_x \cdot t_{\text{total}} = (v_0 \cos\theta) \cdot t_{\text{total}}$$
+4. **Jarak Jangkauan Terjauh ($X_{\max}$):**
+   $$X_{\max} = v_x \cdot t_{\text{total}} = (v_0 \cos\theta) \cdot t_{\text{total}}$$
 5. **Laju saat Menyentuh Tanah ($v_{\text{land}}$):**
    $$v_{\text{land}} = \sqrt{v_0^2 + 2 g h_0}$$
 

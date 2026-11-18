@@ -37,7 +37,7 @@
  *    - Waktu total melayang di udara sampai menyentuh tanah (y = 0):
  *        t_total = (v0 * sin(theta) + sqrt((v0 * sin(theta))^2 + 2 * g * h0)) / g
  *    - Jarak jangkauan horizontal terjauh:
- *        Rmax = vx * t_total = v0 * cos(theta) * t_total
+ *        Xmax = vx * t_total = v0 * cos(theta) * t_total
  *    - Laju akhir sesaat sebelum menyentuh tanah (Hukum Kekekalan Energi):
  *        v_land = sqrt(v0^2 + 2 * g * h0)
  * =========================================================================================
@@ -101,7 +101,7 @@ let clouds = [];                 // Awan kartun yang bergerak di latar belakang
 let showVectors = true;          // Tampilkan panah vektor kecepatan (vx, vy, v)
 let showTrail = true;            // Tampilkan garis jejak lintasan
 let showTheoreticalPath = true;  // Tampilkan garis putus-putus perkiraan lintasan analitis
-let showMarkers = true;          // Tampilkan penanda puncak (Hmax) dan pendaratan (Rmax)
+let showMarkers = true;          // Tampilkan penanda puncak (Hmax) dan pendaratan (Xmax)
 let autoScale = true;            // Penyesuaian skala otomatis agar seluruh parabola muat di layar
 
 // --- Status Interaksi Mouse Dragging ---
@@ -217,14 +217,14 @@ function draw() {
   }
 
   let ana = calculateAnalytical(v0, angleDeg, h0, gravity);
-  updateScale(ana.Rmax, ana.Hmax);
+  updateScale(ana.Xmax, ana.Hmax);
 
   if (simState === 'FLYING') {
     updatePhysics(ana);
   }
 
   updateParticles();
-  drawMeterRuler(ana.Rmax, ana.Hmax);
+  drawMeterRuler(ana.Xmax, ana.Hmax);
 
   let cannonY = GROUND_Y - h0 * meterToPixel;
   drawWoodenPlatform(ORIGIN_X, GROUND_Y, cannonY, h0);
@@ -277,19 +277,19 @@ function calculateAnalytical(v_init, deg, y0, g_acc) {
     tTotal = (v0y + Math.sqrt(discriminant)) / g_acc;
   }
 
-  let Rmax = v0x * tTotal;
+  let Xmax = v0x * tTotal;
   let vLand = Math.sqrt(v_init * v_init + 2 * g_acc * y0);
 
-  return { rad, v0x, v0y, tPeak, Hmax, tTotal, Rmax, xPeak, vLand };
+  return { rad, v0x, v0y, tPeak, Hmax, tTotal, Xmax, Rmax: Xmax, xPeak, vLand };
 }
 
 // =========================================================================================
 // BAGIAN 5: SISTEM SKALA ADAPTIF OTOMATIS (AUTO-SCALING)
 // =========================================================================================
-function updateScale(Rmax, Hmax) {
+function updateScale(Xmax, Hmax) {
   if (!autoScale) return;
 
-  let maxRefX = Math.max(Rmax, target.x + 10, 20);
+  let maxRefX = Math.max(Xmax, target.x + 10, 20);
   let maxRefY = Math.max(Hmax, target.y + 10, 15);
 
   let safeW = VIEW_W - 90;
@@ -380,7 +380,7 @@ function updatePhysics(ana) {
   }
 
   if (simTime >= ana.tTotal || (proj.y <= 0 && simTime > 0.04)) {
-    proj.x = ana.Rmax;
+    proj.x = ana.Xmax;
     proj.y = 0;
     let vyLand = -Math.sqrt(ana.v0y * ana.v0y + 2 * gravity * h0);
     proj.vy = vyLand;
@@ -511,7 +511,7 @@ function drawClouds() {
 // =========================================================================================
 // BAGIAN 8: PENGGARIS SKALA SATUAN METER (GRID SYSTEM)
 // =========================================================================================
-function drawMeterRuler(Rmax, Hmax) {
+function drawMeterRuler(Xmax, Hmax) {
   push();
   let stepMeter = 10;
   if (meterToPixel < 0.25) stepMeter = 200;
@@ -966,7 +966,7 @@ function drawInspectorRow(label, val, valColor, x, y) {
 }
 
 // =========================================================================================
-// BAGIAN 14: LINTASAN TEORETIS & PENANDA TITIK KUNCI (Hmax & Rmax)
+// BAGIAN 14: LINTASAN TEORETIS & PENANDA TITIK KUNCI (Hmax & Xmax)
 // =========================================================================================
 function drawTheoreticalPath(v_init, deg, y0, g_acc, t_total) {
   if (t_total <= 0) return;
@@ -1028,7 +1028,7 @@ function drawMarkers(ana) {
   push();
   let peakPx = ORIGIN_X + ana.xPeak * meterToPixel;
   let peakPy = GROUND_Y - ana.Hmax * meterToPixel;
-  let landPx = ORIGIN_X + ana.Rmax * meterToPixel;
+  let landPx = ORIGIN_X + ana.Xmax * meterToPixel;
   let landPy = GROUND_Y;
 
   if (ana.Hmax > 0.5) {
@@ -1063,7 +1063,7 @@ function drawMarkers(ana) {
     textStyle(NORMAL);
   }
 
-  if (ana.Rmax > 1.0) {
+  if (ana.Xmax > 1.0) {
     // Tiang bendera dan bendera penanda pendaratan
     stroke(229, 57, 53);
     strokeWeight(2.5);
@@ -1074,7 +1074,7 @@ function drawMarkers(ana) {
     triangle(landPx, landPy - 26, landPx, landPy - 14, landPx + 16, landPy - 20);
     ellipse(landPx, landPy, 9, 9);
 
-    // Badge label R_maks diposisikan di ATAS bendera agar tidak tertutup panel kontrol bawah
+    // Badge label X_maks diposisikan di ATAS bendera agar tidak tertutup panel kontrol bawah
     let badgeW = 90;
     let badgeH = 20;
     let badgeX = constrain(landPx, badgeW / 2 + 15, width - badgeW / 2 - 15);
@@ -1085,19 +1085,19 @@ function drawMarkers(ana) {
     strokeWeight(1);
     line(landPx, landPy - 26, badgeX, badgeY + badgeH);
 
-    // Kotak badge R_maks yang cerah dan kontras tinggi
+    // Kotak badge X_maks yang cerah dan kontras tinggi
     fill(255, 235, 238);
     stroke(198, 40, 40);
     strokeWeight(1.5);
     rect(badgeX - badgeW / 2, badgeY, badgeW, badgeH, 5);
 
-    // Teks R_maks (Jangkauan Maksimum / Radius)
+    // Teks X_maks (Jangkauan Maksimum Horizontal)
     noStroke();
     fill(198, 40, 40);
     textSize(10);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Rₘₐₖₛ: ' + ana.Rmax.toFixed(1) + 'm', badgeX, badgeY + badgeH / 2);
+    text('Xₘₐₖₛ: ' + ana.Xmax.toFixed(1) + 'm', badgeX, badgeY + badgeH / 2);
     textStyle(NORMAL);
   }
   pop();
@@ -1244,7 +1244,7 @@ function drawTelemetryOverlay(ana) {
   line(boxX + 10, sy + lh * 6 - 2, boxX + boxW - 10, sy + lh * 6 - 2);
 
   drawWhiteDataRow('Tinggi Maks (Hₘₐₖₛ)', ana.Hmax.toFixed(2) + ' m', '#ff9800', boxX + 12, sy + lh * 6 + 7);
-  drawWhiteDataRow('Jarak Terjauh (Rₘₐₖₛ)', ana.Rmax.toFixed(2) + ' m', '#e53935', boxX + 12, sy + lh * 7 + 7);
+  drawWhiteDataRow('Jarak Terjauh (Xₘₐₖₛ)', ana.Xmax.toFixed(2) + ' m', '#e53935', boxX + 12, sy + lh * 7 + 7);
   pop();
 }
 
