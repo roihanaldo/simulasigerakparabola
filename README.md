@@ -79,7 +79,7 @@ Gerak parabola tanpa hambatan udara merupakan perpaduan dua gerak yang saling be
 
 ### Opsi 3: GitHub Pages
 Aktifkan **GitHub Pages** di repositori Anda (*Settings* > *Pages* > pilih branch `main` / root) untuk memainkan simulasi secara online kapan saja melalui tautan:
-`https://roihanaldo-commits.github.io/simulasigerakparabola/`
+`https://roihanaldo.github.io/simulasigerakparabola/`
 
 ---
 
