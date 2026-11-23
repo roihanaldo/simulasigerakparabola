@@ -110,7 +110,7 @@ let lastPigSampleTime = 0;       // Interval pencuplikan titik babi
 let particles = [];              // Partikel asap dan percikan tanah
 let confetti = [];               // Konfeti kemenangan
 let woodDebris = [];             // Puing balok kayu yang hancur berhamburan
-let comicEffects = [];           // Pop-up komik (TUMBUKAN!, HANCUR!, THUMP!)
+let simplePopups = [];           // Pop-up komik (TUMBUKAN!, HANCUR!, THUMP!)
 let screenShake = 0;             // Getaran kamera
 let clouds = [];                 // Awan kartun
 
@@ -303,7 +303,7 @@ function draw() {
 
   updateParticles();
   updateWoodDebris();
-  updateComicEffects();
+  updateSimplePopups();
 
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
@@ -351,7 +351,7 @@ function draw() {
   // Menggambar Partikel, Serpihan Kayu, dan Teks Komik
   drawParticles();
   drawWoodDebris();
-  drawComicEffects();
+  drawSimplePopups();
 
   pop(); // Akhir blok getaran kamera
 
@@ -466,7 +466,7 @@ function fireProjectile() {
   particles = [];
   confetti = [];
   woodDebris = [];
-  comicEffects = [];
+  simplePopups = [];
   screenShake = 0;
 
   addSampledNode(0, proj.x, proj.y, proj.vx, proj.vy, proj.v, 1);
@@ -590,12 +590,12 @@ function updatePhysics(ana) {
 
             // EVALUASI AMBANG KERUSAKAN (DAMAGE THRESHOLD)
             if (v_rel < 7.5) {
-              // TINGKAT 1: PELAN (Wobble & geser sedikit, TIDAK LANGSUNG HANCUR)
+              // TINGKAT 1: PELAN (Wobble & geser sedikit, tidak hancur)
               let dmg = Math.round(map(v_rel, 0, 7.5, 5, 20));
               box.hp -= dmg;
               if (box.damageState === 0) box.damageState = 1;
-              box.wobble = (proj.vx > 0 ? 0.12 : -0.12);
-              box.vx += (proj.vx > 0 ? 0.35 : -0.35) * (v_rel / 7.5);
+              box.wobble = (proj.vx > 0 ? 0.08 : -0.08);
+              box.vx += (proj.vx > 0 ? 0.25 : -0.25) * (v_rel / 7.5);
 
               let e = 0.45;
               let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
@@ -604,17 +604,17 @@ function updatePhysics(ana) {
 
               let hitPx = ORIGIN_X + nearX * meterToPixel;
               let hitPy = GROUND_Y - nearY * meterToPixel;
-              createPuffParticles(hitPx, hitPy);
-              triggerComicBurst(hitPx, hitPy, 'THUMP!', 'GOYANG!');
+              createPuffParticles(hitPx, hitPy, 3);
+              triggerSimplePopup(hitPx, hitPy, `-${dmg} HP`, '#64748b');
 
             } else if (v_rel < 17.0 && box.hp > 35) {
-              // TINGKAT 2: SEDANG (Retakan nyata pada kayu, kotak terdorong jatuh)
+              // TINGKAT 2: SEDANG (Retakan muncul pada balok kayu)
               let dmg = Math.round(map(v_rel, 7.5, 17.0, 35, 65));
               box.hp -= dmg;
               box.damageState = 2; // Retakan muncul
-              box.vx += proj.vx * 0.40;
-              box.vy += Math.max(proj.vy * 0.35, 2.0);
-              box.rotSpeed = random(-3, 3);
+              box.vx += proj.vx * 0.35;
+              box.vy += Math.max(proj.vy * 0.3, 1.8);
+              box.rotSpeed = random(-2, 2);
 
               let e = 0.55;
               let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
@@ -623,13 +623,13 @@ function updatePhysics(ana) {
 
               let hitPx = ORIGIN_X + nearX * meterToPixel;
               let hitPy = GROUND_Y - nearY * meterToPixel;
-              createWoodDebris(hitPx, hitPy, 6);
-              createPuffParticles(hitPx, hitPy);
-              triggerComicBurst(hitPx, hitPy, '💥 RETAK!', `-${dmg} HP`);
-              screenShake = 6;
+              createWoodDebris(hitPx, hitPy, 4);
+              createPuffParticles(hitPx, hitPy, 4);
+              triggerSimplePopup(hitPx, hitPy, 'Retak', '#d97706');
+              screenShake = 2;
 
             } else {
-              // TINGKAT 3: KERAS (Kotak hancur berkeping-keping!)
+              // TINGKAT 3: KERAS (Kotak hancur rapi menjadi beberapa serpihan kayu)
               box.hp = 0;
               box.damageState = 3;
               box.isDestroyed = true;
@@ -637,10 +637,10 @@ function updatePhysics(ana) {
 
               let hitPx = ORIGIN_X + box.x * meterToPixel;
               let hitPy = GROUND_Y - box.y * meterToPixel;
-              createWoodDebris(hitPx, hitPy, 18);
-              createPuffParticles(hitPx, hitPy);
-              triggerComicBurst(hitPx, hitPy, '💥 HANCUR!', '+50 PTS');
-              screenShake = 12;
+              createWoodDebris(hitPx, hitPy, 6);
+              createPuffParticles(hitPx, hitPy, 5);
+              triggerSimplePopup(hitPx, hitPy, '+50', '#059669');
+              screenShake = 3;
 
               proj.vx *= 0.72;
               proj.vy *= 0.78;
@@ -673,10 +673,10 @@ function updatePhysics(ana) {
       let v_rel = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
 
       if (v_rel < 6.0) {
-        // Tumbukan pelan: babi kaget dan bergoyang
-        pig.rotation += (proj.vx > 0 ? 0.25 : -0.25);
-        pig.x += (proj.vx > 0 ? 0.35 : -0.35);
-        triggerComicBurst(ORIGIN_X + pig.x * meterToPixel, GROUND_Y - pig.y * meterToPixel, 'OINK?!', 'KAGET!');
+        // Tumbukan pelan: babi kaget dan bergoyang sedikit
+        pig.rotation += (proj.vx > 0 ? 0.2 : -0.2);
+        pig.x += (proj.vx > 0 ? 0.3 : -0.3);
+        triggerSimplePopup(ORIGIN_X + pig.x * meterToPixel, GROUND_Y - pig.y * meterToPixel, 'Kaget!', '#475569');
         proj.vx *= -0.3;
       } else {
         // Tumbukan keras: babi terpental dalam hukum kekekalan momentum 2D!
@@ -693,8 +693,8 @@ function updatePhysics(ana) {
         let v2x_prime = v2n_prime * nx;
         let v2y_prime = v2n_prime * ny;
 
-        v2y_prime = Math.max(v2y_prime, 4.2);
-        v2x_prime = Math.max(v2x_prime, 5.0);
+        v2y_prime = Math.max(v2y_prime, 3.8);
+        v2x_prime = Math.max(v2x_prime, 4.5);
 
         collisionData = {
           time: simTime,
@@ -723,21 +723,97 @@ function updatePhysics(ana) {
         pig.vx = v2x_prime;
         pig.vy = v2y_prime;
         pig.v = collisionData.v2_after;
-        pig.rotSpeed = random(8, 14);
+        pig.rotSpeed = random(6, 11);
 
         target.isHit = true;
         target.score += 100;
 
         let hitPx = ORIGIN_X + pig.x * meterToPixel;
         let hitPy = GROUND_Y - pig.y * meterToPixel;
-        createVictoryConfetti(hitPx, hitPy);
-        createPuffParticles(hitPx, hitPy);
-        createWoodDebris(hitPx, hitPy, 14);
-        triggerComicBurst(hitPx, hitPy, '💥 TUMBUKAN!', '+100 PTS');
-        screenShake = 16;
+        createPuffParticles(hitPx, hitPy, 5);
+        createWoodDebris(hitPx, hitPy, 5);
+        triggerSimplePopup(hitPx, hitPy, '+100', '#059669');
+        screenShake = 3;
 
         addCollisionSampleNode(simTime, proj.x, proj.y, collisionData);
       }
+    }
+  }
+
+  // =======================================================================================
+  // 4B. DUKUNGAN FISIKA BENTENG & BABI (JATUH JIKA PENOPANG DI BAWAHNYA HANCUR/JATUH)
+  //     Menghindari babi atau balok atas melayang saat struktur bawahnya runtuh!
+  // =======================================================================================
+  // A. Kotak tingkat atas kehilangan balok penopang bawah
+  for (let b of boxes) {
+    if (b.isDestroyed || b.isAwake) continue;
+    if (b.y > b.h / 2 + 0.3) {
+      let hasSupport = false;
+      for (let lower of boxes) {
+        if (lower.id !== b.id && !lower.isDestroyed) {
+          let overlapX = Math.abs(b.x - lower.x) < (b.w / 2 + lower.w / 2 - 0.3);
+          let underY = (lower.y + lower.h / 2) >= (b.y - b.h / 2 - 0.4) && (lower.y < b.y);
+          if (overlapX && underY) {
+            hasSupport = true;
+            if (lower.isAwake && Math.abs(lower.vy) > 0.4) {
+              b.isAwake = true;
+            }
+            break;
+          }
+        }
+      }
+      if (!hasSupport) {
+        b.isAwake = true;
+        b.vy = -1.0;
+      }
+    }
+  }
+
+  // B. Babi kehilangan kotak penopang langsung di bawahnya
+  if (!pig.landed && !pig.isFlying) {
+    let supported = false;
+    let supportBox = null;
+    let highestTop = 0;
+
+    for (let box of boxes) {
+      if (box.isDestroyed) continue;
+      let halfW = box.w / 2 + 0.5;
+      if (Math.abs(pig.x - box.x) < halfW) {
+        let topY = box.y + box.h / 2;
+        // Babi hanya ditopang jika permukaannya persis di bawah telapak babi (jarak < 0.45m)
+        let distToSole = (pig.y - 1.1) - topY;
+        if (Math.abs(distToSole) <= 0.45 && topY > highestTop) {
+          highestTop = topY;
+          supportBox = box;
+          supported = true;
+        }
+      }
+    }
+
+    if (supported && supportBox) {
+      if (supportBox.isAwake) {
+        pig.y = highestTop + 1.1;
+        pig.vy = supportBox.vy;
+        pig.vx = supportBox.vx * 0.7;
+        pig.rotation = supportBox.rot;
+        if (supportBox.y <= supportBox.h / 2 + 0.1 && Math.abs(supportBox.vy) < 0.2) {
+          pig.y = highestTop + 1.1;
+          pig.vy = 0;
+          pig.vx = 0;
+        }
+      } else {
+        pig.y = highestTop + 1.1;
+      }
+    } else {
+      // TIDAK ADA KOTAK YANG MENAHANNYA! Babi langsung jatuh bebas ke tanah!
+      pig.isFlying = true;
+      pig.isHit = true;
+      target.isHit = true;
+      target.score += 100;
+      pig.vy = -1.2;
+      pig.vx = (random() > 0.5 ? 1 : -1) * random(0.5, 1.2);
+      pig.rotSpeed = random(-3, 3);
+      triggerSimplePopup(ORIGIN_X + pig.x * meterToPixel, GROUND_Y - pig.y * meterToPixel, '+100', '#059669');
     }
   }
 
@@ -903,7 +979,7 @@ function resetSimulation() {
   particles = [];
   confetti = [];
   woodDebris = [];
-  comicEffects = [];
+  simplePopups = [];
   screenShake = 0;
 
   // Reset benteng kotak kayu
@@ -1198,8 +1274,31 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   textAlign(CENTER, CENTER);
   text(Math.round(angle) + '°', baseX + 51, cannonY - 14);
 
-  // 4. INDIKATOR DAYA SAAT MERIAM DI-DRAG
+  // 4. INDIKATOR GARIS BIDIK & PENGUKUR DAYA SAAT MERIAM DI-DRAG
   if (isAimingCannon && simState === 'IDLE') {
+    let rad = -radians(angle);
+    let muzzleDist = 46 + (cannonRecoilOffset || 0);
+    let mx = baseX + muzzleDist * Math.cos(rad);
+    let my = cannonY + muzzleDist * Math.sin(rad);
+
+    // Garis bidik putus-putus ke arah sasaran
+    stroke(255, 152, 0, 180);
+    strokeWeight(1.8);
+    drawingContext.setLineDash([4, 4]);
+    line(mx, my, mx + 45 * Math.cos(rad), my + 45 * Math.sin(rad));
+    drawingContext.setLineDash([]);
+
+    // Tali elastis penanda tarikan mouse jika ditarik ke belakang
+    if (mouseX < baseX) {
+      stroke(229, 57, 53, 140);
+      strokeWeight(1.5);
+      drawingContext.setLineDash([2, 3]);
+      line(baseX, cannonY, mouseX, mouseY);
+      drawingContext.setLineDash([]);
+      fill(229, 57, 53);
+      noStroke();
+      ellipse(mouseX, mouseY, 6, 6);
+    }
     let pGaugeX = baseX;
     let pGaugeY = cannonY - 55;
     let pGaugeW = 145;
@@ -2051,50 +2150,50 @@ function createVictoryConfetti(x, y) {
   }
 }
 
-function createPuffParticles(x, y) {
-  for (let i = 0; i < 16; i++) {
+function createPuffParticles(x, y, count = 5) {
+  for (let i = 0; i < count; i++) {
     particles.push({
       x: x,
       y: y,
-      vx: random(-2.5, 4),
-      vy: random(-3, 3),
-      size: random(8, 18),
-      alpha: 220,
-      decay: random(8, 14),
-      color: color(255, random(220, 255), random(200, 255))
+      vx: random(-1.5, 2.0),
+      vy: random(-1.8, 1.2),
+      size: random(4, 8),
+      alpha: 150,
+      decay: random(7, 12),
+      color: color(245, 245, 245)
     });
   }
 }
 
 function createDirtThud(x, y) {
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 5; i++) {
     particles.push({
       x: x,
       y: y,
-      vx: random(-5, 5),
-      vy: random(-7, -1),
-      size: random(4, 9),
-      alpha: 255,
-      decay: random(8, 14),
+      vx: random(-2.5, 2.5),
+      vy: random(-3, -1),
+      size: random(3, 5),
+      alpha: 180,
+      decay: random(9, 15),
       color: color(166, 115, 68)
     });
   }
 }
 
-function createWoodDebris(x, y, count = 16) {
-  let woodColors = ['#8d6e63', '#6d4c41', '#5d4037', '#a1887f', '#d7ccc8'];
+function createWoodDebris(x, y, count = 5) {
+  let woodColors = ['#8d6e63', '#6d4c41', '#a1887f', '#bcaaa4'];
   for (let i = 0; i < count; i++) {
     woodDebris.push({
       x: x,
       y: y,
-      vx: random(-9, 13),
-      vy: random(-14, -3),
-      w: random(6, 15),
-      h: random(3, 8),
+      vx: random(-3.0, 4.0),
+      vy: random(-4.5, -1.2),
+      w: random(4, 7),
+      h: random(2, 4),
       rot: random(TWO_PI),
-      vRot: random(-0.25, 0.25),
+      vRot: random(-0.2, 0.2),
       col: random(woodColors),
-      alpha: 255
+      alpha: 240
     });
   }
 }
@@ -2104,17 +2203,17 @@ function updateWoodDebris() {
     let d = woodDebris[i];
     d.x += d.vx;
     d.y += d.vy;
-    d.vy += 0.5;
+    d.vy += 0.35;
     d.rot += d.vRot;
 
     if (d.y >= GROUND_Y - 2) {
       d.y = GROUND_Y - 2;
-      d.vy = -d.vy * 0.45;
-      d.vx *= 0.7;
-      d.vRot *= 0.6;
+      d.vy = -d.vy * 0.25;
+      d.vx *= 0.6;
+      d.vRot *= 0.5;
     }
 
-    d.alpha -= 2.5;
+    d.alpha -= 3.5;
     if (d.alpha <= 0 || d.x > width + 50) {
       woodDebris.splice(i, 1);
     }
@@ -2128,77 +2227,46 @@ function drawWoodDebris() {
     translate(d.x, d.y);
     rotate(d.rot);
     fill(d.col);
-    stroke(50, 30, 10, d.alpha);
-    strokeWeight(1);
+    noStroke();
     rect(-d.w / 2, -d.h / 2, d.w, d.h, 1);
     pop();
   }
   pop();
 }
 
-function triggerComicBurst(x, y, text1, text2) {
-  comicEffects.push({
+function triggerSimplePopup(x, y, text, col = '#0284c7') {
+  simplePopups.push({
     x: x,
-    y: y - 25,
-    text1: text1,
-    text2: text2,
-    scale: 0.1,
-    targetScale: 1.0,
+    y: y - 10,
+    text: text,
+    col: col,
     alpha: 255,
-    life: 75
+    life: 42
   });
 }
 
-function updateComicEffects() {
-  for (let i = comicEffects.length - 1; i >= 0; i--) {
-    let c = comicEffects[i];
-    c.scale = lerp(c.scale, c.targetScale, 0.25);
-    c.life--;
-    if (c.life < 25) {
-      c.alpha = map(c.life, 25, 0, 255, 0);
-    }
-    if (c.life <= 0) {
-      comicEffects.splice(i, 1);
+function updateSimplePopups() {
+  for (let i = simplePopups.length - 1; i >= 0; i--) {
+    let p = simplePopups[i];
+    p.y -= 0.5;
+    p.life--;
+    p.alpha = map(p.life, 0, 42, 0, 255);
+    if (p.life <= 0) {
+      simplePopups.splice(i, 1);
     }
   }
 }
 
-function drawComicEffects() {
+function drawSimplePopups() {
   push();
-  for (let c of comicEffects) {
-    push();
-    translate(c.x, c.y);
-    scale(c.scale);
-
-    fill(255, 235, 59, c.alpha);
-    stroke(213, 0, 0, c.alpha);
-    strokeWeight(3);
-    beginShape();
-    let numPts = 12;
-    for (let i = 0; i < numPts * 2; i++) {
-      let r = (i % 2 === 0) ? 42 : 24;
-      let angle = (i * PI) / numPts;
-      vertex(r * Math.cos(angle), r * Math.sin(angle));
-    }
-    endShape(CLOSE);
-
-    textAlign(CENTER, CENTER);
-    textStyle(BOLD);
-
-    fill(100, 0, 0, c.alpha);
-    textSize(13);
-    text(c.text1, 1, -5);
-    textSize(11);
-    text(c.text2, 1, 11);
-
-    fill(255, 255, 255, c.alpha);
-    textSize(13);
-    text(c.text1, 0, -6);
-    fill(255, 235, 59, c.alpha);
-    textSize(11);
-    text(c.text2, 0, 10);
-
-    pop();
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(12);
+  for (let p of simplePopups) {
+    let c = color(p.col);
+    fill(red(c), green(c), blue(c), p.alpha);
+    noStroke();
+    text(p.text, p.x, p.y);
   }
   pop();
 }
@@ -2672,31 +2740,31 @@ function updateCannonDragFromMouse(cannonY) {
   let dy = mouseY - cannonY;
   let d = dist(mouseX, mouseY, ORIGIN_X, cannonY);
 
-  // Aturan Tarikan Sesuai Permintaan:
+  // Aturan Tarikan Presisi 180 Derajat:
   // - Jika ditarik ke belakang (dx < 0, mouse di sebelah kiri meriam):
-  //   meriam tetap menembak ke depan (lawan arahnya: aimDx = -dx, aimDy = -dy)
-  // - Jika ditarik ke depan (dx >= 0, mouse di sebelah kanan meriam):
-  //   meriam menembak searah tarikan (aimDx = dx, aimDy = -dy)
-  let aimDx, aimDy;
+  //   Arah tembak tepat berlawanan 180 derajat ke depan!
+  //   Contoh: Serong kiri bawah (dx < 0, dy > 0) -> mengarah serong kanan atas (aimX > 0, aimY_phys > 0)
+  //           Serong kiri atas (dx < 0, dy < 0)   -> mengarah serong kanan bawah (aimX > 0, aimY_phys < 0)
+  let aimX, aimY_phys;
   if (dx < 0) {
-    aimDx = -dx;
-    aimDy = -dy;
-    // Efek visual kompresi per laras meriam mundur
+    aimX = -dx;       // Positif (ke kanan)
+    aimY_phys = dy;   // dy > 0 (bawah di layar) menjadi positif (atas di koordinat fisika)
     cannonRecoilOffset = -map(constrain(d, 10, 130), 10, 130, 0, 14);
   } else {
-    aimDx = dx;
-    aimDy = -dy;
+    // Ditarik ke depan (dx >= 0): membidik langsung searah kursor mouse
+    aimX = dx;        // Positif (ke kanan)
+    aimY_phys = -dy;  // dy < 0 (atas di layar) menjadi positif (atas di koordinat fisika)
     cannonRecoilOffset = map(constrain(d, 10, 130), 10, 130, 0, 6);
   }
 
   // Hitung sudut tembak 360 derajat
-  let deg = degrees(Math.atan2(aimDy, aimDx));
+  let deg = degrees(Math.atan2(aimY_phys, aimX));
   if (deg < 0) deg += 360;
   deg = Math.round(deg);
   angleDeg = deg;
   sliders.angle.value = deg;
 
-  // Jarak tarikan menentukan kecepatan awal v0 (batas 10 - 50 m/s)
+  // Jarak tarikan menentukan laju awal v0 (batas 10 - 50 m/s)
   let dClamped = constrain(d, 10, 130);
   let speed = Math.round(map(dClamped, 10, 130, sliders.v0.min, sliders.v0.max));
   v0 = speed;
