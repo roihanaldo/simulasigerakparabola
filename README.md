@@ -2,7 +2,7 @@
 
 Simulasi fisika interaktif berbasis web untuk materi **Gerak Parabola (Projectile Motion)** tanpa hambatan udara (kasus ideal), dikembangkan menggunakan pustaka **[p5.js](https://p5js.org/)**. 
 
-Simulasi ini dikemas dengan estetika cerah bertema petualangan kartun, dilengkapi fitur **inspeksi titik lintasan (click-to-inspect)** dan **mode tantangan sasaran**.
+Simulasi ini mengusung estetika cerah bertema petualangan kartun khas *Angry Birds*, dilengkapi **mekanika ketapel drag 360°**, **ambang batas kerusakan kotak benteng (damage threshold)**, **pendaratan pantul & guling tanah**, serta **inspeksi titik lintasan (click-to-inspect)**.
 
 ---
 
@@ -10,36 +10,48 @@ Simulasi ini dikemas dengan estetika cerah bertema petualangan kartun, dilengkap
 
 ### 1. Kontrol Parameter Interaktif (Slider Presisi)
 * **Kecepatan Awal ($v_0$):** Mengatur kelajuan lontaran peluru ($10 - 100\text{ m/s}$).
-* **Sudut Elevasi ($\theta$):** Mengatur kemiringan sudut penembakan ($0^\circ - 90^\circ$).
-* **Ketinggian Awal ($h_0$):** Mengatur tinggi peluncur dari atas tanah ($0 - 50\text{ meter}$) untuk mensimulasikan tembakan dari atas tebing/platform.
+* **Sudut Peluncur ($\theta$):** Mengatur arah tembakan bebas 360 derajat ($0^\circ - 360^\circ$).
+* **Ketinggian Awal ($h_0$):** Mengatur tinggi peluncur dari atas tanah ($0 - 50\text{ meter}$) untuk mensimulasikan tembakan dari atas platform/tebing.
 * **Percepatan Gravitasi ($g$):** Mengatur kuat medan gravitasi ($1.0 - 20.0\text{ m/s}^2$).
 
-### 2. Kontrol Drag Langsung (Direct Manipulation)
-* **Putar Laras Meriam:** Klik dan seret (drag) moncong meriam secara langsung menggunakan mouse untuk mengarahkan sudut elevasi secara bebas.
-* **Tarik Platform/Tebing:** Klik dan geser dudukan tebing ke atas atau ke bawah untuk mengubah ketinggian awal ($h_0$) secara instan.
+### 2. Mekanika Ketapel Angry Birds (Direct Drag & Release)
+* **Tarik Mundur Ketapel:** Klik dan seret burung pada ketapel ke arah berlawanan untuk menentukan sudut tembakan (hingga 360°) dan laju awal ($v_0$) secara intuitif berdasarkan jarak tarikan.
+* **Indikator Pita Karet & Pengukur Daya:** Dilengkapi visualisasi dua pita elastis yang meregang serta pengukur daya real-time saat membidik.
+* **Lepas untuk Menembak:** Melepaskan tarikan mouse langsung meluncurkan burung ke udara.
+* **Tarik Platform:** Klik dan seret dudukan platform naik atau turun untuk mengubah ketinggian awal ($h_0$) secara instan.
 
-### 3. Inspeksi Titik Lintasan (Interactive Trajectory Inspector)
-* Di sepanjang kurva lintasan, terdapat **titik-titik sampel kuning** yang dicatat setiap selang waktu $\approx 0.12\text{ detik}$.
-* **Klik sembarang titik** untuk membuka **kartu dialog telemetri detail**:
+### 3. Benteng Kotak Kayu & Ambang Kerusakan (Destructible Boxes & Damage Threshold)
+* Sasaran dilindungi oleh benteng balok kotak kayu bertingkat yang dapat ditabrak dan diruntuhkan.
+* **Ambang Kerusakan Realistis:**
+  * **Tumbukan Pelan ($< 7.5\text{ m/s}$):** Kotak hanya bergoyang dan bergeser sedikit tanpa hancur (`THUMP!`).
+  * **Tumbukan Sedang ($7.5 - 17\text{ m/s}$):** Muncul retakan nyata pada tekstur balok kayu dan kotak terdorong jatuh (`RETAK!`).
+  * **Tumbukan Keras ($\ge 17\text{ m/s}$):** Kotak meledak hancur berkeping-keping menjadi serpihan puing kayu (`HANCUR! +50 PTS`).
+
+### 4. Fisika Pendaratan Tanah (Pantulan & Berguling Alami)
+* Burung **tidak langsung berhenti mendadak** saat menyentuh tanah.
+* Mengalami pantulan vertikal elastis ($e = 0.42$), berguling di atas rumput dengan perlambatan gesekan, mengepulkan debu tanah, dan berhenti perlahan pada titik jangkauan akhir $X_{\max}$.
+* Babi dan kotak-kotak yang jatuh juga mengalami pantulan dan gesekan serupa.
+
+### 5. Mode Bersiap Bersih (Preview Tersembunyi)
+* Garis putus-putus lintasan analitis dan penanda puncak ($H_{\max}$) serta pendaratan ($X_{\max}$) **disembunyikan pada mode bersiap (IDLE)** agar pengguna dapat memperkirakan tembakan sendiri.
+* Seluruh penanda dan jejak lintasan otomatis muncul setelah burung ditembakkan.
+
+### 6. Karakter Babi Dinamis & Tumbukan 2D
+* Babi duduk di atas struktur benteng.
+* Tumbukan pelan membuatnya kaget dan bergoyang.
+* Tumbukan keras memicu hukum kekekalan momentum 2D ($e = 0.65$), melontarkan babi dalam gerak parabola terpisah hingga mendarat dengan efek bintang pusing.
+
+### 7. Inspeksi Titik Lintasan (Click to Inspect)
+* Di sepanjang lintasan burung, titik benturan, dan lintasan babi, terdapat titik-titik sampel data.
+* **Klik sembarang titik** untuk membuka dialog telemetri analitis:
   * Waktu tempuh saat di titik tersebut ($t$).
-  * Posisi koordinat horizontal ($x$) dan vertikal ($y$).
+  * Koordinat posisi horizontal ($x$) dan vertikal ($y$).
   * Komponen kecepatan horizontal ($v_x$) dan vertikal ($v_y$).
-  * Resultan kecepatan ($v$) serta sudut arah vektor geraknya ($\alpha$).
-  * Visualisasi mini vektor kecepatan langsung pada titik yang dipilih.
+  * Resultan kecepatan ($v$) dan sudut arah vektor gerak ($\theta$).
+  * Khusus titik benturan: menampilkan perbandingan momentum sebelum dan sesudah tumbukan.
 
-### 4. Mode Tantangan Sasaran (Target Challenge)
-* Karakter target berdiri di atas menara kayu pada koordinat $(X_{\text{target}}, Y_{\text{target}})$.
-* Pengguna ditantang memperhitungkan kecepatan, sudut, dan ketinggian yang tepat untuk mengenai target.
-* Tembakan tepat sasaran memicu ledakan konfeti dan penambahan skor (`+100 PTS`).
-* Tombol **"TARGET BARU"** mengacak posisi jarak dan ketinggian sasaran untuk variasi latihan.
-
-### 5. Visualisasi Vektor Real-time
-* **$v_x$ (Biru Cerah):** Gerak Lurus Beraturan (GLB), nilainya selalu konstan.
-* **$v_y$ (Hijau Segar):** Gerak Lurus Berubah Beraturan (GLBB), mengecil saat naik, bernilai nol di puncak, dan membesar ke arah bawah.
-* **$v$ (Oranye Terang):** Vektor resultan yang menyinggung garis lengkung lintasan parabola.
-
-### 6. Skala Adaptif Otomatis (Auto-Scale)
-* Skala tampilan kanvas menyesuaikan secara proporsional secara otomatis sehingga kurva parabola selalu pas berada di dalam layar tanpa terpotong.
+### 8. Skala Adaptif Otomatis (Auto-Scale)
+* Skala tampilan kanvas menyesuaikan secara proporsional otomatis sehingga seluruh dinamika gerak parabola burung, puing kayu, dan babi tetap muat di dalam layar.
 
 ---
 
