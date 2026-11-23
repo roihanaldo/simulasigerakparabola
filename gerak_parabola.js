@@ -1,22 +1,28 @@
 /**
  * SIMULASI FISIKA GERAK PARABOLA & UJI TANTANGAN SASARAN (EDISI ANGRY BIRDS)
  * =========================================================================================
- * Fitur Utama:
- * 1. Mekanika Ketapel & Meriam Angry Birds: Drag untuk mengatur sudut 360° & laju awal (v0),
- *    lepaskan tarikan untuk menembakkan burung dengan pita karet elastis dan indikator daya!
- * 2. Preview Tersembunyi: Garis lintasan putus-putus dan penanda Xmaks & Hmaks disembunyikan
- *    pada mode bersiap (IDLE) dan HANYA muncul setelah burung ditembakkan.
- * 3. Kotak Target Hancur Bertahap (Destructible Boxes): Struktur benteng kayu dengan kotak-kotak
- *    yang dapat ditabrak, bergeser, retak, dan hancur berkeping-keping.
- * 4. Efek Ambang Kerusakan (Damage Threshold):
- *    - Tumbukan pelan (< 7.5 m/s): Kotak bergoyang, bergeser sedikit, tidak hancur (thump!).
- *    - Tumbukan sedang (7.5 - 17 m/s): Muncul retakan nyata pada kayu, kotak terdorong jatuh.
- *    - Tumbukan keras (>= 17 m/s): Kotak meledak menjadi 18 serpihan kayu berhamburan!
- * 5. Fisika Pendaratan Tanah Realistis: Burung tidak langsung berhenti mendadak saat menyentuh
- *    tanah; burung memantul (restitusi 0.42), berguling dengan gesekan rumput, mengepulkan debu,
- *    dan berhenti perlahan di posisi akhir Xmaks yang akurat.
- * 6. Karakter Babi Dinamis: Duduk di atas benteng, kaget jika terkena pelan, terpental dalam
- *    gerak parabola pasca-tumbukan jika terkena keras, dan pingsan dengan bintang pusing.
+ * Revisi Terkini:
+ * 1. Batas Kecepatan Maksimal: Dikurangi dari 100 m/s menjadi 50 m/s agar jangkauan realistis.
+ * 2. Peluncur Tetap Berbentuk Meriam Kartun (Bukan Ketapel):
+ *    - Dapat ditarik ke depan (membidik langsung ke depan) atau ditarik ke belakang
+ *      (meriam tetap membidik dan menembak ke depan/lawan arah tarikan).
+ *    - Jarak tarikan mengatur laju awal v0 (10 - 50 m/s) dan sudut 360°.
+ * 3. Perbaikan Bug Box Hancur:
+ *    - Kotak berada dalam status stabil (isAwake: false) sampai benar-benar ditabrak burung.
+ *    - Kotak tidak akan pernah hancur sendiri saat peluru baru lepas dari laras.
+ * 4. Posisi Xmaks Parabola Pertama:
+ *    - Penanda bendera & badge Xmaks tersimpan tetap pada titik pendaratan lintasan parabola pertama
+ *      (secara analitis), bukan posisi setelah pantulan, gesekan guling, atau tumbukan!
+ * 5. Preview Tersembunyi:
+ *    - Garis putus-putus lintasan dan penanda Xmaks/Hmaks disembunyikan di mode IDLE
+ *      dan hanya muncul setelah ditembakkan.
+ * 6. Ambang Batas Kerusakan (Damage Threshold):
+ *    - Pelan (< 7.5 m/s): Kotak bergoyang, bergeser sedikit, tidak hancur.
+ *    - Sedang (7.5 - 17 m/s): Retakan nyata pada kayu, kotak terdorong jatuh.
+ *    - Keras (>= 17 m/s): Kotak meledak menjadi 18 serpihan puing kayu berhamburan.
+ * 7. Pendaratan Tanah Realistis:
+ *    - Burung memantul di tanah (e = 0.42), berguling dengan gesekan rumput, mengepulkan debu,
+ *      dan berhenti perlahan secara alami.
  * =========================================================================================
  */
 
@@ -25,10 +31,19 @@
 // =========================================================================================
 
 // --- Parameter Fisika Input ---
-let v0 = 42;                     // Kecepatan awal proyektil (m/s), batas: 10 - 100 m/s
+let v0 = 28;                     // Kecepatan awal proyektil (m/s), batas: 10 - 50 m/s
 let angleDeg = 45;               // Sudut elevasi penembakan (derajat), batas: 0 - 360 derajat
 let h0 = 12;                     // Ketinggian awal peluncur dari tanah (meter), batas: 0 - 50 m
 let gravity = 9.8;               // Percepatan gravitasi (m/s^2), batas: 1 - 20 m/s^2
+
+// Parameter Parabola Pertama (Tersimpan Tetap untuk Penanda Xmaks & Hmaks)
+let firstParabolaXmax = 0;
+let firstParabolaHmax = 0;
+let firstParabolaXpeak = 0;
+let initialV0 = 28;
+let initialAngleDeg = 45;
+let initialH0 = 12;
+let initialTTotal = 0;
 
 // --- Status Mesin Simulasi (State Machine) ---
 let simState = 'IDLE';           // 'IDLE', 'FLYING', 'PAUSED', 'LANDED'
@@ -50,22 +65,22 @@ let proj = {
 };
 
 // --- Kotak-Kotak Target yang Dapat Ditabrak (Destructible Boxes) ---
-let boxes = [];                  // Array objek kotak: [{ id, x, y, initX, initY, w, h, vx, vy, rot, rotSpeed, mass, hp, maxHp, damageState, wobble, isDestroyed }]
+let boxes = [];                  // Array objek kotak: [{ id, x, y, initX, initY, w, h, vx, vy, rot, rotSpeed, mass, hp, maxHp, damageState, wobble, isDestroyed, isAwake }]
 
 // --- Misi Target & Karakter Babi Dinamis ---
 let target = {
-  x: 68,                         // Posisi horizontal sasaran (meter)
-  y: 8,                          // Ketinggian sasaran (meter)
+  x: 58,                         // Posisi horizontal sasaran (meter)
+  y: 7,                          // Ketinggian sasaran (meter)
   radius: 3.2,                   // Radius area tabrakan sasaran
   isHit: false,                  // Status terkena tembakan
   score: 0                       // Akumulasi skor pemain
 };
 
 let pig = {
-  x: 68,
-  y: 8,
-  initialX: 68,
-  initialY: 8,
+  x: 58,
+  y: 7,
+  initialX: 58,
+  initialY: 7,
   vx: 0,
   vy: 0,
   v: 0,
@@ -73,8 +88,8 @@ let pig = {
   rotSpeed: 0,
   isFlying: false,
   landed: false,
-  landX: 68,
-  Hmax: 8
+  landX: 58,
+  Hmax: 7
 };
 
 // --- Data Fisika Tumbukan 2 Dimensi (Hukum Kekekalan Momentum) ---
@@ -106,18 +121,17 @@ let showTheoreticalPath = true;  // Garis putus-putus analitis (hanya saat terba
 let showMarkers = true;          // Penanda Hmaks dan Xmaks (hanya saat terbang)
 let autoScale = true;            // Skala adaptif otomatis
 
-// --- Interaksi Tarik Ketapel & Mouse Dragging ---
-let isAimingCannon = false;      // Sedang menarik ketapel/meriam
+// --- Interaksi Tarik Meriam & Mouse Dragging ---
+let isAimingCannon = false;      // Sedang menarik laras meriam dengan mouse
 let isDraggingPlatform = false;  // Sedang menyeret platform tebing h0
-let pullDistance = 0;            // Jarak tarikan ketapel (pixel)
-let pullAngle = 0;               // Sudut tarikan ketapel
+let cannonRecoilOffset = 0;      // Efek per/pegas saat ditarik mundur
 
 // --- Konfigurasi Koordinat Kanvas ---
 const ORIGIN_X = 90;             // Titik poros peluncur di kanvas (pixel)
 const GROUND_Y = 470;            // Garis permukaan tanah (pixel)
 const VIEW_W = 880;              // Lebar efektif area pandang (pixel)
 const VIEW_H = 410;              // Tinggi efektif area pandang (pixel)
-let meterToPixel = 3.6;          // Rasio skala meter ke pixel
+let meterToPixel = 4.2;          // Rasio skala meter ke pixel
 
 // --- Elemen Antarmuka Pengguna (UI Komponen) ---
 let sliders = {};
@@ -127,7 +141,12 @@ let buttons = [];
 // BAGIAN 2: FUNGSI SETUP (DIJALANKAN SEKALI SAAT APLIKASI DIMULAI)
 // =========================================================================================
 function setup() {
-  createCanvas(1040, 665);
+  let cnv = createCanvas(1040, 665);
+  // Lampirkan canvas ke div container agar terpusat rapi dan tidak meluncur keluar layar
+  let container = document.getElementById('sim-container') || document.querySelector('.container');
+  if (container) {
+    cnv.parent(container);
+  }
   textFont('Segoe UI, Tahoma, sans-serif');
 
   // Membuat awan-awan acak di latar belakang langit
@@ -141,9 +160,9 @@ function setup() {
   }
 
   // ---------------------------------------------------------------------------------------
-  // Inisialisasi 4 Slider Parameter Fisika (Sudut Bisa 0 - 360 Derajat!)
+  // Inisialisasi 4 Slider Parameter Fisika (Batas v0: 10 - 50 m/s; Sudut: 0 - 360°)
   // ---------------------------------------------------------------------------------------
-  sliders.v0 = new CartoonSlider(45, 544, 215, 10, 100, v0, 'Kecepatan Awal (v₀)', 'm/s', 1, '#ff5722');
+  sliders.v0 = new CartoonSlider(45, 544, 215, 10, 50, v0, 'Kecepatan Awal (v₀)', 'm/s', 1, '#ff5722');
   sliders.angle = new CartoonSlider(290, 544, 215, 0, 360, angleDeg, 'Sudut Peluncur (θ)', '°', 1, '#ff9800');
   sliders.h0 = new CartoonSlider(535, 544, 215, 0, 50, h0, 'Ketinggian Awal (h₀)', 'm', 1, '#4caf50');
   sliders.gravity = new CartoonSlider(780, 544, 215, 1.0, 20.0, gravity, 'Percepatan Gravitasi (g)', 'm/s²', 0.1, '#00bcd4');
@@ -151,51 +170,51 @@ function setup() {
   // ---------------------------------------------------------------------------------------
   // Inisialisasi Tombol Kontrol Aksi Utama
   // ---------------------------------------------------------------------------------------
-  buttons.push(new CartoonButton(45, 598, 130, 38, '🚀 TEMBAK!', '#4caf50', '#388e3c', () => {
+  buttons.push(new CartoonButton(45, 598, 130, 38, 'TEMBAK!', '#4caf50', '#388e3c', () => {
     fireProjectile();
   }));
 
-  buttons.push(new CartoonButton(186, 598, 115, 38, '⏸ JEDA', '#2196f3', '#1976d2', function() {
+  buttons.push(new CartoonButton(186, 598, 115, 38, 'JEDA', '#2196f3', '#1976d2', function() {
     if (simState === 'FLYING') {
       simState = 'PAUSED';
-      this.label = '▶ LANJUT';
+      this.label = 'LANJUT';
       this.baseColor = '#ff9800';
       this.hoverColor = '#f57c00';
     } else if (simState === 'PAUSED') {
       simState = 'FLYING';
-      this.label = '⏸ JEDA';
+      this.label = 'JEDA';
       this.baseColor = '#2196f3';
       this.hoverColor = '#1976d2';
     }
   }));
 
-  buttons.push(new CartoonButton(312, 598, 105, 38, '🔄 RESET', '#f44336', '#d32f2f', () => {
+  buttons.push(new CartoonButton(312, 598, 105, 38, 'RESET', '#f44336', '#d32f2f', () => {
     resetSimulation();
   }));
 
-  buttons.push(new CartoonButton(428, 598, 140, 38, '🎯 TARGET BARU', '#9c27b0', '#7b1fa2', () => {
+  buttons.push(new CartoonButton(428, 598, 140, 38, 'TARGET BARU', '#9c27b0', '#7b1fa2', () => {
     randomizeTarget();
   }));
 
-  buttons.push(new CartoonButton(579, 598, 125, 38, '⏱ Laju: 1.0x', '#607d8b', '#455a64', function() {
+  buttons.push(new CartoonButton(579, 598, 125, 38, 'Laju: 1.0x', '#607d8b', '#455a64', function() {
     if (simSpeed === 1.0) {
       simSpeed = 0.5;
-      this.label = '⏱ Slow: 0.5x';
+      this.label = 'Slow: 0.5x';
     } else if (simSpeed === 0.5) {
       simSpeed = 0.25;
-      this.label = '⏱ Slow: 0.25x';
+      this.label = 'Slow: 0.25x';
     } else {
       simSpeed = 1.0;
-      this.label = '⏱ Laju: 1.0x';
+      this.label = 'Laju: 1.0x';
     }
   }));
 
-  buttons.push(new CartoonButton(715, 598, 125, 38, '🏹 Vektor: ON', '#3f51b5', '#303f9f', function() {
+  buttons.push(new CartoonButton(715, 598, 125, 38, 'Vektor: ON', '#3f51b5', '#303f9f', function() {
     showVectors = !showVectors;
-    this.label = showVectors ? '🏹 Vektor: ON' : '🏹 Vektor: OFF';
+    this.label = showVectors ? 'Vektor: ON' : 'Vektor: OFF';
   }));
 
-  buttons.push(new CartoonButton(851, 598, 145, 38, '🧹 Hapus Titik', '#78909c', '#546e7a', () => {
+  buttons.push(new CartoonButton(851, 598, 145, 38, 'Hapus Titik', '#78909c', '#546e7a', () => {
     pastTrails = [];
     currentTrail = [];
     pigTrail = [];
@@ -206,90 +225,66 @@ function setup() {
 
   // Membangun benteng kotak kayu awal di lokasi target
   initTargetFortress(target.x, target.y);
+
+  // Inisialisasi kalkulasi awal
+  let anaInit = calculateAnalytical(v0, angleDeg, h0, gravity);
+  firstParabolaXmax = anaInit.Xmax;
+  firstParabolaHmax = anaInit.Hmax;
+  firstParabolaXpeak = anaInit.xPeak;
+  initialTTotal = anaInit.tTotal;
 }
 
 // =========================================================================================
-// INISIALISASI BENTENG KOTAK KAYU ANGRY BIRDS (DESTRUCTIBLE FORTRESS)
+// INISIALISASI BENTENG KOTAK KAYU ANGRY BIRDS (STABIL SEBELUM DITABRAK)
 // =========================================================================================
 function initTargetFortress(tx, ty) {
   boxes = [];
   
-  if (ty <= 6.0) {
-    // Benteng 2 Tingkat di Atas Tanah
-    boxes.push({
-      id: 0, x: tx - 2.0, y: 1.2, initX: tx - 2.0, initY: 1.2,
-      w: 2.2, h: 2.4, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.0,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood1'
-    });
-    boxes.push({
-      id: 1, x: tx + 2.0, y: 1.2, initX: tx + 2.0, initY: 1.2,
-      w: 2.2, h: 2.4, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.0,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood1'
-    });
-    boxes.push({
-      id: 2, x: tx, y: 2.9, initX: tx, initY: 2.9,
-      w: 6.4, h: 1.0, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'beam'
-    });
-    boxes.push({
-      id: 3, x: tx, y: 4.4, initX: tx, initY: 4.4,
-      w: 2.4, h: 2.0, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 2.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood2'
-    });
-    
-    // Babi diletakkan di atas kotak tingkat atas
-    pig.x = tx;
-    pig.y = 6.6;
-    pig.initialX = tx;
-    pig.initialY = 6.6;
-    pig.landX = tx;
-    target.y = 6.6;
-  } else {
-    // Menara Kayu Bertingkat Tinggi
-    boxes.push({
-      id: 0, x: tx - 2.0, y: 1.4, initX: tx - 2.0, initY: 1.4,
-      w: 2.2, h: 2.8, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.2,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood1'
-    });
-    boxes.push({
-      id: 1, x: tx + 2.0, y: 1.4, initX: tx + 2.0, initY: 1.4,
-      w: 2.2, h: 2.8, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.2,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood1'
-    });
-    boxes.push({
-      id: 2, x: tx, y: ty - 3.2, initX: tx, initY: ty - 3.2,
-      w: 6.2, h: 1.0, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'beam'
-    });
-    boxes.push({
-      id: 3, x: tx - 1.6, y: ty - 1.6, initX: tx - 1.6, initY: ty - 1.6,
-      w: 2.0, h: 2.2, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 2.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood2'
-    });
-    boxes.push({
-      id: 4, x: tx + 1.6, y: ty - 1.6, initX: tx + 1.6, initY: ty - 1.6,
-      w: 2.0, h: 2.2, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 2.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'wood2'
-    });
-    boxes.push({
-      id: 5, x: tx, y: ty - 0.5, initX: tx, initY: ty - 0.5,
-      w: 5.4, h: 0.8, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 2.5,
-      hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, colorType: 'beam'
-    });
+  // Konstruksi benteng kotak kayu yang stabil dan kokoh
+  // Kotak bawah menempel di tanah (y = h/2) sehingga tidak jatuh
+  let hGround = 2.4;
+  boxes.push({
+    id: 0, x: tx - 1.8, y: hGround / 2, initX: tx - 1.8, initY: hGround / 2,
+    w: 2.2, h: hGround, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.0,
+    hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, isAwake: false, colorType: 'wood1'
+  });
+  boxes.push({
+    id: 1, x: tx + 1.8, y: hGround / 2, initX: tx + 1.8, initY: hGround / 2,
+    w: 2.2, h: hGround, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.0,
+    hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, isAwake: false, colorType: 'wood1'
+  });
 
-    pig.x = tx;
-    pig.y = ty + 0.9;
-    pig.initialX = tx;
-    pig.initialY = ty + 0.9;
-    pig.landX = tx;
-  }
+  // Balok lantai tengah bertengger di atas kotak 0 dan 1
+  let hBeam = 0.9;
+  let yBeam = hGround + hBeam / 2;
+  boxes.push({
+    id: 2, x: tx, y: yBeam, initX: tx, initY: yBeam,
+    w: 6.0, h: hBeam, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 3.5,
+    hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, isAwake: false, colorType: 'beam'
+  });
+
+  // Kotak tumpuan atas di tengah balok
+  let hPedestal = 2.0;
+  let yPedestal = hGround + hBeam + hPedestal / 2;
+  boxes.push({
+    id: 3, x: tx, y: yPedestal, initX: tx, initY: yPedestal,
+    w: 2.2, h: hPedestal, vx: 0, vy: 0, rot: 0, rotSpeed: 0, mass: 2.5,
+    hp: 100, maxHp: 100, damageState: 0, wobble: 0, isDestroyed: false, isAwake: false, colorType: 'wood2'
+  });
+
+  // Babi duduk manis di atas kotak tumpuan atas
+  pig.x = tx;
+  pig.y = yPedestal + hPedestal / 2 + 1.1;
+  pig.initialX = tx;
+  pig.initialY = pig.y;
+  pig.landX = tx;
+  target.y = pig.y;
 }
 
 // =========================================================================================
 // BAGIAN 3: DRAW LOOP UTAMA (DIULANG ~60 KALI PER DETIK)
 // =========================================================================================
 function draw() {
-  // 1. Membaca nilai dari slider jika tidak sedang menarik ketapel
   if (!isAimingCannon) {
     v0 = sliders.v0.value;
     angleDeg = sliders.angle.value;
@@ -297,14 +292,11 @@ function draw() {
   h0 = sliders.h0.value;
   gravity = sliders.gravity.value;
 
-  // 2. Kalkulasi fisika analitis
   let ana = calculateAnalytical(v0, angleDeg, h0, gravity);
-  updateScale(ana.Xmax, ana.Hmax);
+  updateScale(firstParabolaXmax || ana.Xmax, firstParabolaHmax || ana.Hmax);
 
-  // 3. Menggambar latar belakang lingkungan kartun
   drawCartoonEnvironment();
 
-  // 4. Update fisika jika sedang melayang
   if (simState === 'FLYING') {
     updatePhysics(ana);
   }
@@ -315,7 +307,7 @@ function draw() {
 
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
-  // 5. Efek Getaran Kamera (Screen Shake)
+  // Efek Getaran Layar
   push();
   if (screenShake > 0) {
     translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
@@ -323,12 +315,12 @@ function draw() {
     if (screenShake < 0.2) screenShake = 0;
   }
 
-  drawMeterRuler(ana.Xmax, ana.Hmax);
+  drawMeterRuler(firstParabolaXmax || ana.Xmax, firstParabolaHmax || ana.Hmax);
   drawWoodenPlatform(ORIGIN_X, GROUND_Y, cannonY, h0);
 
-  // PREVIEW LINTASAN HANYA MUNCUL SETELAH DITEMBAKKAN (TIDAK MUNCUL DI IDLE)
+  // 1. PREVIEW LINTASAN HANYA MUNCUL SETELAH DITEMBAKKAN (TIDAK MUNCUL DI IDLE)
   if (showTheoreticalPath && simState !== 'IDLE') {
-    drawTheoreticalPath(v0, angleDeg, h0, gravity, ana.tTotal);
+    drawTheoreticalPath(initialV0, initialAngleDeg, initialH0, gravity, initialTTotal);
   }
 
   if (showTrail) {
@@ -339,10 +331,10 @@ function draw() {
   // Menggambar Kotak-Kotak Target Kayu
   drawDestructibleBoxes();
 
-  // Menggambar Babi & Menara Tantangan
+  // Menggambar Babi & Sasaran
   drawChallengeTarget();
 
-  // PENANDA HMAKS & XMAKS HANYA MUNCUL SETELAH DITEMBAKKAN
+  // 2. PENANDA HMAKS & XMAKS PARABOLA PERTAMA HANYA MUNCUL SETELAH DITEMBAKKAN
   if (showMarkers && simState !== 'IDLE') {
     drawMarkers(ana);
   }
@@ -350,7 +342,7 @@ function draw() {
   // Menggambar Titik Sampel Lintasan (Click to Inspect)
   drawSampledNodes();
 
-  // Menggambar Peluncur Ketapel/Meriam Kartun
+  // Menggambar Peluncur Meriam Kartun (Bukan Ketapel)
   drawCartoonLauncher(ORIGIN_X, cannonY, angleDeg);
 
   // Menggambar Karakter Burung Proyektil & Vektor Kecepatan
@@ -363,12 +355,10 @@ function draw() {
 
   pop(); // Akhir blok getaran kamera
 
-  // Kartu Inspeksi Data jika ada titik sampel yang diklik
   if (selectedNode) {
     drawNodeInspectorCard(selectedNode);
   }
 
-  // Antarmuka UI (Telemetri, Banner Tantangan, Panel Kontrol)
   drawTelemetryOverlay(ana);
   drawChallengeBanner();
   drawControlInterface();
@@ -405,7 +395,7 @@ function calculateAnalytical(v_init, deg, y0, g_acc) {
 function updateScale(Xmax, Hmax) {
   if (!autoScale) return;
 
-  let maxRefX = Math.max(Math.abs(Xmax), target.x + 15, Math.abs(proj.x) + 15, 20);
+  let maxRefX = Math.max(Math.abs(Xmax), target.x + 18, Math.abs(proj.x) + 15, 20);
   if (collisionData) {
     maxRefX = Math.max(maxRefX, pig.landX + 15, (proj.landX || 0) + 15);
   }
@@ -416,7 +406,7 @@ function updateScale(Xmax, Hmax) {
 
   let targetScaleX = safeW / maxRefX;
   let targetScaleY = safeH / maxRefY;
-  let targetScale = constrain(Math.min(targetScaleX, targetScaleY), 0.05, 10.0);
+  let targetScale = constrain(Math.min(targetScaleX, targetScaleY), 0.05, 8.0);
 
   if (simState === 'IDLE' && !isDraggingPlatform) {
     meterToPixel = lerp(meterToPixel, targetScale, 0.15);
@@ -428,7 +418,7 @@ function updateScale(Xmax, Hmax) {
 }
 
 // =========================================================================================
-// BAGIAN 6: LOGIKA TEMBAK, INTEGRASI FISIKA NUMERIK, TABRAKAN KOTAK & AMBANG KERUSAKAN
+// BAGIAN 6: LOGIKA TEMBAK, INTEGRASI FISIKA NUMERIK, AMBANG KERUSAKAN KOTAK & PANTULAN
 // =========================================================================================
 function fireProjectile() {
   if (simState === 'FLYING') return;
@@ -436,6 +426,16 @@ function fireProjectile() {
   let rad = radians(angleDeg);
   let v0x = v0 * Math.cos(rad);
   let v0y = v0 * Math.sin(rad);
+
+  // Simpan nilai awal untuk kalkulasi garis parabola pertama dan penanda Xmaks
+  initialV0 = v0;
+  initialAngleDeg = angleDeg;
+  initialH0 = h0;
+  let anaInit = calculateAnalytical(v0, angleDeg, h0, gravity);
+  firstParabolaXmax = anaInit.Xmax;
+  firstParabolaHmax = anaInit.Hmax;
+  firstParabolaXpeak = anaInit.xPeak;
+  initialTTotal = anaInit.tTotal;
 
   proj.x = 0;
   proj.y = h0;
@@ -480,7 +480,7 @@ function fireProjectile() {
 
   let pauseBtn = buttons.find(b => b.label.includes('JEDA') || b.label.includes('LANJUT'));
   if (pauseBtn) {
-    pauseBtn.label = '⏸ JEDA';
+    pauseBtn.label = 'JEDA';
     pauseBtn.baseColor = '#2196f3';
     pauseBtn.hoverColor = '#1976d2';
   }
@@ -491,16 +491,14 @@ function updatePhysics(ana) {
   simTime += effectiveDt;
 
   // =======================================================================================
-  // 1. GERAK PROYEKTIL BURUNG (INTEGRASI NUMERIK SEMI-IMPLICIT EULER)
+  // 1. GERAK PROYEKTIL BURUNG (SEMI-IMPLICIT EULER)
   // =======================================================================================
   if (!proj.landed) {
-    // Gravitasi pada sumbu Y
     proj.vy -= gravity * effectiveDt;
     proj.x += proj.vx * effectiveDt;
     proj.y += proj.vy * effectiveDt;
     proj.v = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
 
-    // Rotasi visual burung mengikuti lintasan jika di udara
     if (proj.y > 0.05) {
       proj.rotation = Math.atan2(-proj.vy, proj.vx);
     }
@@ -513,20 +511,19 @@ function updatePhysics(ana) {
     }
 
     // =====================================================================================
-    // 2. FISIKA PENDARATAN TANAH (MEMANTUL, BERGULING & BERHENTI PERLAHAN)
+    // 2. FISIKA PENDARATAN TANAH (BURUNG MEMANTUL & BERGULING ALAMI)
     // =====================================================================================
     if (proj.y <= 0) {
       proj.y = 0;
       if (Math.abs(proj.vy) > 1.2) {
-        // Memantul (Bounce) dengan koefisien restitusi tanah
-        proj.vy = -proj.vy * 0.42;
+        proj.vy = -proj.vy * 0.42; // Pantulan elastis tanah
         proj.bounceCount++;
         createDirtThud(ORIGIN_X + proj.x * meterToPixel, GROUND_Y);
       } else {
         proj.vy = 0;
       }
 
-      // Gesekan permukaan tanah / rumput (Rolling Friction)
+      // Perlambatan gesekan rumput saat berguling
       proj.vx *= 0.94;
       proj.rotation += (proj.vx * effectiveDt) / 0.8;
 
@@ -534,7 +531,7 @@ function updatePhysics(ana) {
         createDirtThud(ORIGIN_X + proj.x * meterToPixel, GROUND_Y);
       }
 
-      // Berhenti total jika laju sudah sangat rendah
+      // Berhenti perlahan setelah energi gesekan habis
       if (Math.abs(proj.vx) < 0.22 && proj.vy === 0) {
         proj.vx = 0;
         proj.v = 0;
@@ -545,99 +542,112 @@ function updatePhysics(ana) {
     }
 
     // =====================================================================================
-    // 3. DETEKSI TUMBUKAN DENGAN KOTAK-KOTAK TARGET & AMBANG KERUSAKAN (DAMAGE THRESHOLD)
+    // 3. DETEKSI TUMBUKAN KOTAK DENGAN AMBANG KERUSAKAN (DAMAGE THRESHOLD)
+    //    Hanya berlaku jika burung sudah terbang dan mendekati posisi kotak!
     // =====================================================================================
-    for (let box of boxes) {
-      if (box.isDestroyed) continue;
+    if (proj.x > 5.0) { // Menghindari false detection saat burung baru keluar laras
+      for (let box of boxes) {
+        if (box.isDestroyed) continue;
 
-      let dx = proj.x - box.x;
-      let dy = proj.y - box.y;
-      let halfW = box.w / 2;
-      let halfH = box.h / 2;
+        let dx = proj.x - box.x;
+        let dy = proj.y - box.y;
+        let halfW = box.w / 2;
+        let halfH = box.h / 2;
 
-      let clampX = constrain(dx, -halfW, halfW);
-      let clampY = constrain(dy, -halfH, halfH);
+        let clampX = constrain(dx, -halfW, halfW);
+        let clampY = constrain(dy, -halfH, halfH);
 
-      let nearX = box.x + clampX;
-      let nearY = box.y + clampY;
+        let nearX = box.x + clampX;
+        let nearY = box.y + clampY;
 
-      let distSq = (proj.x - nearX) * (proj.x - nearX) + (proj.y - nearY) * (proj.y - nearY);
-      let birdRadius = 1.2;
+        let distSq = (proj.x - nearX) * (proj.x - nearX) + (proj.y - nearY) * (proj.y - nearY);
+        let birdRadius = 1.2;
 
-      if (distSq < birdRadius * birdRadius) {
-        let d = Math.sqrt(distSq);
-        if (d < 0.001) d = 0.001;
-        let nx = (proj.x - nearX) / d;
-        let ny = (proj.y - nearY) / d;
+        if (distSq < birdRadius * birdRadius) {
+          let d = Math.sqrt(distSq);
+          if (d < 0.001) d = 0.001;
+          let nx = (proj.x - nearX) / d;
+          let ny = (proj.y - nearY) / d;
 
-        let rvx = proj.vx - box.vx;
-        let rvy = proj.vy - box.vy;
-        let v_rel = Math.sqrt(rvx * rvx + rvy * rvy);
-        let v_normal = rvx * nx + rvy * ny;
+          let rvx = proj.vx - box.vx;
+          let rvy = proj.vy - box.vy;
+          let v_rel = Math.sqrt(rvx * rvx + rvy * rvy);
+          let v_normal = rvx * nx + rvy * ny;
 
-        if (v_normal < -0.2) {
-          let mBird = 1.0;
-          let mBox = box.mass;
+          if (v_normal < -0.2) {
+            // Kotak bangun dari mode diam
+            box.isAwake = true;
 
-          // EVALUASI AMBANG KERUSAKAN (DAMAGE THRESHOLD)
-          if (v_rel < 7.5) {
-            // TINGKAT 1: PELAN (Wobble & bergeser sedikit, TIDAK HANCUR)
-            let dmg = Math.round(map(v_rel, 0, 7.5, 5, 20));
-            box.hp -= dmg;
-            if (box.damageState === 0) box.damageState = 1;
-            box.wobble = (proj.vx > 0 ? 0.12 : -0.12);
-            box.vx += (proj.vx > 0 ? 0.4 : -0.4) * (v_rel / 7.5);
+            // Bangunkan kotak-kotak yang bertumpu di atasnya
+            for (let other of boxes) {
+              if (!other.isDestroyed && other.y > box.y && Math.abs(other.x - box.x) < 3.2) {
+                other.isAwake = true;
+              }
+            }
 
-            let e = 0.45;
-            let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
-            proj.vx += (impulse / mBird) * nx * 0.7;
-            proj.vy += (impulse / mBird) * ny * 0.7;
+            let mBird = 1.0;
+            let mBox = box.mass;
 
-            let hitPx = ORIGIN_X + nearX * meterToPixel;
-            let hitPy = GROUND_Y - nearY * meterToPixel;
-            createPuffParticles(hitPx, hitPy);
-            triggerComicBurst(hitPx, hitPy, 'THUMP!', 'GOYANG!');
+            // EVALUASI AMBANG KERUSAKAN (DAMAGE THRESHOLD)
+            if (v_rel < 7.5) {
+              // TINGKAT 1: PELAN (Wobble & geser sedikit, TIDAK LANGSUNG HANCUR)
+              let dmg = Math.round(map(v_rel, 0, 7.5, 5, 20));
+              box.hp -= dmg;
+              if (box.damageState === 0) box.damageState = 1;
+              box.wobble = (proj.vx > 0 ? 0.12 : -0.12);
+              box.vx += (proj.vx > 0 ? 0.35 : -0.35) * (v_rel / 7.5);
 
-          } else if (v_rel < 17.0 && box.hp > 35) {
-            // TINGKAT 2: SEDANG (Retakan muncul pada kayu, kotak terdorong jatuh)
-            let dmg = Math.round(map(v_rel, 7.5, 17.0, 35, 65));
-            box.hp -= dmg;
-            box.damageState = 2;
-            box.vx += proj.vx * 0.42;
-            box.vy += Math.max(proj.vy * 0.35, 2.2);
-            box.rotSpeed = random(-3, 3);
+              let e = 0.45;
+              let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
+              proj.vx += (impulse / mBird) * nx * 0.7;
+              proj.vy += (impulse / mBird) * ny * 0.7;
 
-            let e = 0.55;
-            let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
-            proj.vx += (impulse / mBird) * nx * 0.75;
-            proj.vy += (impulse / mBird) * ny * 0.75;
+              let hitPx = ORIGIN_X + nearX * meterToPixel;
+              let hitPy = GROUND_Y - nearY * meterToPixel;
+              createPuffParticles(hitPx, hitPy);
+              triggerComicBurst(hitPx, hitPy, 'THUMP!', 'GOYANG!');
 
-            let hitPx = ORIGIN_X + nearX * meterToPixel;
-            let hitPy = GROUND_Y - nearY * meterToPixel;
-            createWoodDebris(hitPx, hitPy, 6);
-            createPuffParticles(hitPx, hitPy);
-            triggerComicBurst(hitPx, hitPy, '💥 RETAK!', `-${dmg} HP`);
-            screenShake = 6;
+            } else if (v_rel < 17.0 && box.hp > 35) {
+              // TINGKAT 2: SEDANG (Retakan nyata pada kayu, kotak terdorong jatuh)
+              let dmg = Math.round(map(v_rel, 7.5, 17.0, 35, 65));
+              box.hp -= dmg;
+              box.damageState = 2; // Retakan muncul
+              box.vx += proj.vx * 0.40;
+              box.vy += Math.max(proj.vy * 0.35, 2.0);
+              box.rotSpeed = random(-3, 3);
 
-          } else {
-            // TINGKAT 3: KERAS (Kotak hancur berkeping-keping!)
-            box.hp = 0;
-            box.damageState = 3;
-            box.isDestroyed = true;
-            target.score += 50;
+              let e = 0.55;
+              let impulse = -(1 + e) * v_normal / (1 / mBird + 1 / mBox);
+              proj.vx += (impulse / mBird) * nx * 0.75;
+              proj.vy += (impulse / mBird) * ny * 0.75;
 
-            let hitPx = ORIGIN_X + box.x * meterToPixel;
-            let hitPy = GROUND_Y - box.y * meterToPixel;
-            createWoodDebris(hitPx, hitPy, 18);
-            createPuffParticles(hitPx, hitPy);
-            triggerComicBurst(hitPx, hitPy, '💥 HANCUR!', '+50 PTS');
-            screenShake = 12;
+              let hitPx = ORIGIN_X + nearX * meterToPixel;
+              let hitPy = GROUND_Y - nearY * meterToPixel;
+              createWoodDebris(hitPx, hitPy, 6);
+              createPuffParticles(hitPx, hitPy);
+              triggerComicBurst(hitPx, hitPy, '💥 RETAK!', `-${dmg} HP`);
+              screenShake = 6;
 
-            proj.vx *= 0.72;
-            proj.vy *= 0.78;
+            } else {
+              // TINGKAT 3: KERAS (Kotak hancur berkeping-keping!)
+              box.hp = 0;
+              box.damageState = 3;
+              box.isDestroyed = true;
+              target.score += 50;
+
+              let hitPx = ORIGIN_X + box.x * meterToPixel;
+              let hitPy = GROUND_Y - box.y * meterToPixel;
+              createWoodDebris(hitPx, hitPy, 18);
+              createPuffParticles(hitPx, hitPy);
+              triggerComicBurst(hitPx, hitPy, '💥 HANCUR!', '+50 PTS');
+              screenShake = 12;
+
+              proj.vx *= 0.72;
+              proj.vy *= 0.78;
+            }
+
+            addSampledNode(simTime, proj.x, proj.y, proj.vx, proj.vy, proj.v, 2);
           }
-
-          addSampledNode(simTime, proj.x, proj.y, proj.vx, proj.vy, proj.v, 2);
         }
       }
     }
@@ -648,11 +658,11 @@ function updatePhysics(ana) {
     let dPig = dist(proj.x, proj.y, pig.x, pig.y);
     let pigRadius = 1.8;
 
-    if (!pig.isHit && dPig <= pigRadius) {
+    if (!pig.isHit && dPig <= pigRadius && proj.x > 5.0) {
       let dx = pig.x - proj.x;
       let dy = pig.y - proj.y;
       let dActual = Math.sqrt(dx * dx + dy * dy);
-      if (dActual < 0.001) { dx = 1; dy = 0; dActual = 1; }
+      if (dActual < 0.001) dActual = 0.001;
       let nx = dx / dActual;
       let ny = dy / dActual;
       let tx = -ny;
@@ -663,13 +673,13 @@ function updatePhysics(ana) {
       let v_rel = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
 
       if (v_rel < 6.0) {
-        // Tumbukan pelan ke babi: hanya kaget & bergoyang
+        // Tumbukan pelan: babi kaget dan bergoyang
         pig.rotation += (proj.vx > 0 ? 0.25 : -0.25);
         pig.x += (proj.vx > 0 ? 0.35 : -0.35);
         triggerComicBurst(ORIGIN_X + pig.x * meterToPixel, GROUND_Y - pig.y * meterToPixel, 'OINK?!', 'KAGET!');
         proj.vx *= -0.3;
       } else {
-        // Tumbukan keras ke babi: terpental dalam gerak parabola baru!
+        // Tumbukan keras: babi terpental dalam hukum kekekalan momentum 2D!
         let m1 = 1.0;
         let m2 = 1.3;
         let e = 0.65;
@@ -769,10 +779,11 @@ function updatePhysics(ana) {
   }
 
   // =======================================================================================
-  // 6. GERAK FISIKA KOTAK-KOTAK KAYU JATUH & MEMANTUL
+  // 6. GERAK FISIKA KOTAK-KOTAK KAYU YANG BANGUN (TERJATUH & MEMANTUL)
+  //    Kotak hanya bergerak jika isAwake: true!
   // =======================================================================================
   for (let box of boxes) {
-    if (box.isDestroyed) continue;
+    if (box.isDestroyed || !box.isAwake) continue;
 
     if (box.y > box.h / 2) {
       box.vy -= gravity * effectiveDt;
@@ -781,6 +792,7 @@ function updatePhysics(ana) {
       box.rot += box.rotSpeed * effectiveDt;
     }
 
+    // Kotak jatuh menabrak tanah
     if (box.y <= box.h / 2) {
       box.y = box.h / 2;
       if (Math.abs(box.vy) > 1.0) {
@@ -797,7 +809,7 @@ function updatePhysics(ana) {
     box.wobble *= 0.88;
   }
 
-  // Cek jika seluruh pergerakan selesai
+  // Cek apakah seluruh gerak burung dan babi sudah selesai
   if (proj.landed && (!pig.isFlying || pig.landed)) {
     simState = 'LANDED';
   }
@@ -894,20 +906,27 @@ function resetSimulation() {
   comicEffects = [];
   screenShake = 0;
 
-  // Reset posisi kotak-kotak kayu
+  // Reset benteng kotak kayu
   initTargetFortress(target.x, target.y);
+
+  // Perbarui kalkulasi parabola pertama
+  let anaInit = calculateAnalytical(v0, angleDeg, h0, gravity);
+  firstParabolaXmax = anaInit.Xmax;
+  firstParabolaHmax = anaInit.Hmax;
+  firstParabolaXpeak = anaInit.xPeak;
+  initialTTotal = anaInit.tTotal;
 
   let pauseBtn = buttons.find(b => b.label.includes('JEDA') || b.label.includes('LANJUT'));
   if (pauseBtn) {
-    pauseBtn.label = '⏸ JEDA';
+    pauseBtn.label = 'JEDA';
     pauseBtn.baseColor = '#2196f3';
     pauseBtn.hoverColor = '#1976d2';
   }
 }
 
 function randomizeTarget() {
-  target.x = Math.round(random(35, 120));
-  target.y = Math.round(random(2, 28));
+  target.x = Math.round(random(35, 100));
+  target.y = Math.round(random(3, 18));
   initTargetFortress(target.x, target.y);
   target.isHit = false;
   resetSimulation();
@@ -917,7 +936,6 @@ function randomizeTarget() {
 // BAGIAN 7: PENGGAMBARAN ALAM & LINGKUNGAN KARTUN
 // =========================================================================================
 function drawCartoonEnvironment() {
-  // Gradien langit biru cerah
   for (let y = 0; y < GROUND_Y; y += 4) {
     let inter = map(y, 0, GROUND_Y, 0, 1);
     let c = lerpColor(color(186, 230, 253), color(224, 242, 254), inter);
@@ -926,7 +944,6 @@ function drawCartoonEnvironment() {
     line(0, y, width, y);
   }
 
-  // Matahari kartun cerah berkilau
   noStroke();
   fill(255, 235, 59, 120);
   ellipse(width - 130, 95, 105, 105);
@@ -935,7 +952,6 @@ function drawCartoonEnvironment() {
 
   drawClouds();
 
-  // Bukit-bukit kartun di kejauhan
   fill(167, 243, 208);
   arc(220, GROUND_Y, 440, 190, PI, TWO_PI);
   fill(110, 231, 183);
@@ -943,18 +959,15 @@ function drawCartoonEnvironment() {
   fill(52, 211, 153);
   arc(930, GROUND_Y, 480, 170, PI, TWO_PI);
 
-  // Permukaan tanah rumput hijau cerah & lapisan tanah cokelat
   fill(34, 197, 94);
   stroke(22, 163, 74);
   strokeWeight(2);
   rect(0, GROUND_Y, width, 18);
 
-  // Lapisan tanah bawah
   fill(146, 64, 14);
   noStroke();
   rect(0, GROUND_Y + 18, width, height - (GROUND_Y + 18));
 
-  // Pola rumput bergerigi
   fill(74, 222, 128);
   for (let gx = 0; gx < width; gx += 16) {
     triangle(gx, GROUND_Y, gx + 8, GROUND_Y - 5, gx + 16, GROUND_Y);
@@ -1007,7 +1020,6 @@ function drawMeterRuler(Xmax, Hmax) {
   }
   drawingContext.setLineDash([]);
 
-  // Label angka meter horizontal
   fill(71, 85, 105);
   noStroke();
   textSize(9.5);
@@ -1018,7 +1030,6 @@ function drawMeterRuler(Xmax, Hmax) {
     text(m + 'm', px, GROUND_Y + 4);
   }
 
-  // Label angka meter vertikal
   textAlign(RIGHT, CENTER);
   for (let ym = stepMeter; ym <= Hmax + 25; ym += stepMeter) {
     let py = GROUND_Y - ym * meterToPixel;
@@ -1085,7 +1096,7 @@ function drawWoodenPlatform(baseX, groundY, cannonY, currentH0) {
 }
 
 // =========================================================================================
-// BAGIAN 10: PENGGAMBARAN PELUNCUR MERIAM & KETAPEL ANGRY BIRDS (DRAG 360°)
+// BAGIAN 10: PENGGAMBARAN PELUNCUR MERIAM KARTUN (TETAP MERIAM, BISA DITARIK DEPAN/BELAKANG)
 // =========================================================================================
 function drawCartoonLauncher(baseX, cannonY, angle) {
   push();
@@ -1094,68 +1105,81 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   let dMouse = dist(mouseX, mouseY, baseX, cannonY);
   let isHover = (dMouse < 85 && simState === 'IDLE');
 
-  // Indikator area interaksi ketapel saat hover atau drag
+  // Lingkaran area interaksi halus saat hover
   if (isHover || isAimingCannon) {
-    fill(255, 235, 59, 40);
-    stroke(255, 193, 7, 180);
+    fill(255, 235, 59, 35);
+    stroke(255, 193, 7, 160);
     strokeWeight(1.5);
     drawingContext.setLineDash([4, 4]);
     ellipse(0, 0, 130, 130);
     drawingContext.setLineDash([]);
   }
 
-  // Dudukan Poros Peluncur
+  // 1. RODA PEDATI MERIAM KAYU (CARTOON CANNON CARRIAGE)
   fill(160, 95, 45);
   stroke(90, 45, 15);
   strokeWeight(2.5);
-  ellipse(0, 4, 34, 34);
-  fill(210, 140, 75);
-  ellipse(0, 4, 18, 18);
-  fill(90, 45, 15);
-  ellipse(0, 4, 7, 7);
+  ellipse(0, 6, 38, 38);
 
-  // Laras Meriam Berputar Mengikuti Sudut (0 - 360 Derajat!)
+  // Ruji-ruji roda kayu
+  stroke(110, 60, 20);
+  strokeWeight(1.8);
+  for (let a = 0; a < TWO_PI; a += PI / 4) {
+    line(0, 6, 17 * Math.cos(a), 6 + 17 * Math.sin(a));
+  }
+
+  // Velg tengah roda
+  fill(210, 140, 75);
+  stroke(90, 45, 15);
+  strokeWeight(2);
+  ellipse(0, 6, 16, 16);
+  fill(90, 45, 15);
+  noStroke();
+  ellipse(0, 6, 6, 6);
+
+  // 2. LARAS MERIAM BESI BERPUTAR 360 DERAJAT
+  push();
   rotate(-radians(angle));
 
+  // Efek kompresi pegas jika ditarik ke belakang
+  let recoilX = (isAimingCannon ? cannonRecoilOffset : 0);
+
+  // Pegas recoil jika meriam ditarik ke belakang
+  if (isAimingCannon && cannonRecoilOffset < -3) {
+    stroke(255, 193, 7);
+    strokeWeight(2.5);
+    noFill();
+    beginShape();
+    for (let sx = -15; sx <= recoilX; sx += 3) {
+      let sy = ((sx % 6 === 0) ? -5 : 5);
+      vertex(sx, sy);
+    }
+    endShape();
+  }
+
+  // Tabung Badan Laras Meriam
   fill(isAimingCannon ? '#e53935' : '#d32f2f');
   stroke(70, 15, 15);
   strokeWeight(2.5);
-  rect(0, -9, 48, 18, 5);
+  rect(recoilX, -10, 48, 20, 5);
 
+  // Cincin Kuningan Moncong Meriam
   fill(255, 193, 7);
   stroke(130, 95, 0);
   strokeWeight(2);
-  rect(42, -10, 9, 20, 3);
+  rect(recoilX + 42, -11, 9, 22, 3);
 
-  fill(255, 235, 59);
-  stroke(255);
+  // Lubang Moncong Meriam
+  fill(40, 15, 15);
+  stroke(255, 235, 59);
   strokeWeight(1.5);
-  ellipse(46, 0, 9, 9);
-
-  // PITA KARET KETAPEL ANGRY BIRDS SAAT DI-DRAG
-  if (isAimingCannon && simState === 'IDLE') {
-    // Menghitung posisi burung yang ditarik relatif terhadap poros
-    let dx = mouseX - baseX;
-    let dy = mouseY - cannonY;
-    let d = dist(mouseX, mouseY, baseX, cannonY);
-    let dClamped = constrain(d, 0, 130);
-    let pullRelX = (d > 0 ? (dx / d) * dClamped : 0);
-    let pullRelY = (d > 0 ? (dy / d) * dClamped : 0);
-
-    // Ubah koordinat relatif kembali ke sistem koordinat laras meriam
-    let localPullX = pullRelX * Math.cos(radians(angle)) - pullRelY * Math.sin(radians(angle));
-    let localPullY = pullRelX * Math.sin(radians(angle)) + pullRelY * Math.cos(radians(angle));
-
-    // Dua pita karet elastis ketapel
-    stroke(62, 39, 35);
-    strokeWeight(4.5);
-    line(10, -12, localPullX, localPullY);
-    line(10, 12, localPullX, localPullY);
-  }
+  ellipse(recoilX + 47, 0, 9, 11);
 
   pop();
 
-  // Label Sudut dan Indikator Busur
+  pop();
+
+  // 3. BADGE SUDUT ELEVASI
   push();
   noFill();
   stroke(255, 87, 34, 160);
@@ -1174,11 +1198,11 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
   textAlign(CENTER, CENTER);
   text(Math.round(angle) + '°', baseX + 51, cannonY - 14);
 
-  // INDIKATOR PENGUKUR DAYA SAAT DRAG KETAPEL
+  // 4. INDIKATOR DAYA SAAT MERIAM DI-DRAG
   if (isAimingCannon && simState === 'IDLE') {
     let pGaugeX = baseX;
     let pGaugeY = cannonY - 55;
-    let pGaugeW = 140;
+    let pGaugeW = 145;
     let pGaugeH = 24;
 
     fill(255, 255, 255, 245);
@@ -1186,9 +1210,8 @@ function drawCartoonLauncher(baseX, cannonY, angle) {
     strokeWeight(1.5);
     rect(pGaugeX - pGaugeW / 2, pGaugeY, pGaugeW, pGaugeH, 6);
 
-    // Bar daya terisi proporsional
-    let fillW = map(v0, 10, 100, 4, pGaugeW - 8);
-    let powerColor = lerpColor(color(76, 175, 80), color(244, 67, 54), map(v0, 10, 100, 0, 1));
+    let fillW = map(v0, 10, 50, 4, pGaugeW - 8);
+    let powerColor = lerpColor(color(76, 175, 80), color(244, 67, 54), map(v0, 10, 50, 0, 1));
     fill(powerColor);
     noStroke();
     rect(pGaugeX - pGaugeW / 2 + 4, pGaugeY + 4, fillW, pGaugeH - 8, 4);
@@ -1213,19 +1236,10 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   let currentV = v0;
 
   if (simState === 'IDLE') {
-    if (isAimingCannon) {
-      // Posisi burung saat ditarik di ketapel
-      let dx = mouseX - baseX;
-      let dy = mouseY - cannonY;
-      let d = dist(mouseX, mouseY, baseX, cannonY);
-      let dClamped = constrain(d, 0, 130);
-      px = baseX + (d > 0 ? (dx / d) * dClamped : 0);
-      py = cannonY + (d > 0 ? (dy / d) * dClamped : 0);
-    } else {
-      let rad = radians(angleDeg);
-      px = baseX + 48 * Math.cos(rad);
-      py = cannonY - 48 * Math.sin(rad);
-    }
+    let rad = radians(angleDeg);
+    let muzzleOffset = (isAimingCannon ? 46 + cannonRecoilOffset : 46);
+    px = baseX + muzzleOffset * Math.cos(rad);
+    py = cannonY - muzzleOffset * Math.sin(rad);
   } else {
     px = ORIGIN_X + proj.x * meterToPixel;
     py = GROUND_Y - proj.y * meterToPixel;
@@ -1243,11 +1257,11 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   translate(px, py);
   if (simState === 'FLYING' || simState === 'LANDED') {
     rotate(proj.rotation);
-  } else if (isAimingCannon) {
+  } else {
     rotate(-radians(angleDeg));
   }
 
-  // Badan Bulat Merah Burung Angry Birds
+  // Badan Bulat Merah Burung
   fill(229, 57, 53);
   stroke(136, 14, 14);
   strokeWeight(2);
@@ -1283,7 +1297,7 @@ function drawCharacterProjectile(baseX, cannonY, ana) {
   strokeWeight(1);
   triangle(4, -1, 4, 4, 12, 1.5);
 
-  // Jambul Bulu di Atas Kepala
+  // Jambul Bulu
   fill(229, 57, 53);
   stroke(136, 14, 14);
   strokeWeight(1.5);
@@ -1351,7 +1365,6 @@ function drawDestructibleBoxes() {
     translate(px, py);
     rotate(box.rot + box.wobble);
 
-    // Warna balok kayu
     if (box.colorType === 'beam') {
       fill(198, 134, 66);
       stroke(92, 56, 24);
@@ -1364,10 +1377,9 @@ function drawDestructibleBoxes() {
     }
     strokeWeight(2.2);
 
-    // Kotak Utama
     rect(-pw / 2, -ph / 2, pw, ph, 3);
 
-    // Pola Palang Kayu Silang (X-Braces)
+    // Pola Palang Kayu Silang
     stroke(92, 56, 24, 160);
     strokeWeight(1.6);
     line(-pw / 2 + 3, -ph / 2 + 3, pw / 2 - 3, ph / 2 - 3);
@@ -1381,7 +1393,7 @@ function drawDestructibleBoxes() {
     ellipse(-pw / 2 + 4, ph / 2 - 4, 3, 3);
     ellipse(pw / 2 - 4, ph / 2 - 4, 3, 3);
 
-    // EFEK AMBANG KERUSAKAN: RETAKAN NYATA PADA KAYU JIKA RUSAK SEDANG
+    // EFEK AMBANG KERUSAKAN: RETAKAN NYATA PADA KAYU
     if (box.damageState === 2 || (box.hp < 70 && box.hp > 0)) {
       stroke(40, 15, 5);
       strokeWeight(2.2);
@@ -1413,15 +1425,11 @@ function drawChallengeTarget() {
   let tPy = GROUND_Y - target.y * meterToPixel;
 
   if (!pig.isHit && !pig.isFlying) {
-    // -------------------------------------------------------------------------------------
-    // BABI HIJAU ANGRY BIRDS SIAGA DI ATAS BENTENG
-    // -------------------------------------------------------------------------------------
     let pPx = ORIGIN_X + pig.x * meterToPixel;
     let pPy = GROUND_Y - pig.y * meterToPixel;
     let breath = Math.sin(frameCount * 0.08) * 1.2;
     pPy += breath;
 
-    // Telinga Babi
     fill(92, 184, 92);
     stroke(46, 125, 50);
     strokeWeight(2);
@@ -1432,18 +1440,15 @@ function drawChallengeTarget() {
     ellipse(pPx - 11, pPy - 13, 4, 6);
     ellipse(pPx + 11, pPy - 13, 4, 6);
 
-    // Badan Bulat Babi Hijau
     fill(139, 195, 74);
     stroke(46, 125, 50);
     strokeWeight(2.5);
     ellipse(pPx, pPy, 32, 28);
 
-    // Sorot Cahaya Badan
     fill(178, 223, 138, 140);
     noStroke();
     ellipse(pPx - 4, pPy - 7, 18, 10);
 
-    // Hidung / Moncong
     fill(165, 214, 167);
     stroke(46, 125, 50);
     strokeWeight(2);
@@ -1453,7 +1458,6 @@ function drawChallengeTarget() {
     ellipse(pPx - 3.5, pPy + 2, 3, 4);
     ellipse(pPx + 3.5, pPy + 2, 3, 4);
 
-    // Mata Besar Kartun
     fill(255);
     stroke(30);
     strokeWeight(1.2);
@@ -1467,14 +1471,12 @@ function drawChallengeTarget() {
     ellipse(pPx - 9.5, pPy - 5, 1.2, 1.2);
     ellipse(pPx + 4.5, pPy - 5, 1.2, 1.2);
 
-    // Alis Babi
     stroke(46, 125, 50);
     strokeWeight(2);
     noFill();
     arc(pPx - 7, pPy - 8.5, 7, 4, PI + 0.3, TWO_PI);
     arc(pPx + 7, pPy - 8.5, 7, 4, PI, TWO_PI - 0.3);
 
-    // Badge Koordinat Target di Atas Babi
     fill(255);
     stroke(105, 55, 20);
     strokeWeight(2);
@@ -1485,13 +1487,10 @@ function drawChallengeTarget() {
     textSize(9.5);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text(`🎯 X:${target.x}m Y:${Math.round(target.y)}m`, pPx, pPy - 26);
+    text(`X:${target.x}m Y:${Math.round(target.y)}m`, pPx, pPy - 26);
     textStyle(NORMAL);
 
   } else {
-    // -------------------------------------------------------------------------------------
-    // PASCA-TUMBUKAN: BABI TERPENTAL SECARA FISIK ATAU MENDARAT PINGSAN
-    // -------------------------------------------------------------------------------------
     if (pig.isFlying && !pig.landed) {
       let pPx = ORIGIN_X + pig.x * meterToPixel;
       let pPy = GROUND_Y - pig.y * meterToPixel;
@@ -1584,7 +1583,6 @@ function drawSampledNodes() {
   hoveredNode = null;
   push();
 
-  // 1. Titik-titik Sampel Burung & Titik Tumbukan Spesial
   for (let pt of sampledNodes) {
     let px = ORIGIN_X + pt.x * meterToPixel;
     let py = GROUND_Y - pt.y * meterToPixel;
@@ -1638,7 +1636,6 @@ function drawSampledNodes() {
     }
   }
 
-  // 2. Titik-titik Sampel Babi
   for (let pt of pigSampledNodes) {
     let px = ORIGIN_X + pt.x * meterToPixel;
     let py = GROUND_Y - pt.y * meterToPixel;
@@ -1665,7 +1662,6 @@ function drawSampledNodes() {
     strokeWeight(isHover || isSelected ? 2.5 : 1.5);
     ellipse(px, py, isHover ? 11 : 7.5, isHover ? 11 : 7.5);
   }
-
   pop();
 }
 
@@ -1855,7 +1851,6 @@ function drawPastTrails() {
 function drawCurrentTrail() {
   push();
 
-  // 1. Jejak Lintasan Burung
   if (currentTrail.length >= 2) {
     noFill();
     strokeWeight(3.2);
@@ -1878,7 +1873,6 @@ function drawCurrentTrail() {
     endShape();
   }
 
-  // 2. Jejak Lintasan Babi
   if (pigTrail.length >= 2) {
     noFill();
     stroke(118, 255, 3);
@@ -1898,10 +1892,10 @@ function drawMarkers(ana) {
 
   push();
 
-  // 1. Penanda Titik Puncak H_maks
-  if (ana.Hmax > 0.5) {
-    let peakPx = ORIGIN_X + ana.xPeak * meterToPixel;
-    let peakPy = GROUND_Y - ana.Hmax * meterToPixel;
+  // 1. Penanda Titik Puncak H_maks Parabola Pertama
+  if (firstParabolaHmax > 0.5) {
+    let peakPx = ORIGIN_X + firstParabolaXpeak * meterToPixel;
+    let peakPy = GROUND_Y - firstParabolaHmax * meterToPixel;
 
     stroke(255, 193, 7);
     strokeWeight(1.5);
@@ -1930,14 +1924,14 @@ function drawMarkers(ana) {
     textSize(9.5);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Hₘₐₖₛ: ' + ana.Hmax.toFixed(1) + 'm', hBadgeX, hBadgeY + hBadgeH / 2);
+    text('Hmaks: ' + firstParabolaHmax.toFixed(1) + 'm', hBadgeX, hBadgeY + hBadgeH / 2);
     textStyle(NORMAL);
   }
 
-  // 2. Penanda Pendaratan Akhir Burung (X_maks Burung)
-  let birdLandX = (proj.landed && proj.landX > 0) ? proj.landX : (collisionData ? proj.x : ana.Xmax);
-  if (Math.abs(birdLandX) > 0.5) {
-    let landPx = ORIGIN_X + birdLandX * meterToPixel;
+  // 2. PENANDA XMAKS PARABOLA PERTAMA (TETAP MENANDAI PENDARATAN PARABOLA AWAL)
+  //    TIDAK BERUBAH OLEH HASIL PANTULAN ATAU TUMBUKAN!
+  if (Math.abs(firstParabolaXmax) > 0.5) {
+    let landPx = ORIGIN_X + firstParabolaXmax * meterToPixel;
     let landPy = GROUND_Y;
 
     // Tiang bendera merah
@@ -1950,7 +1944,7 @@ function drawMarkers(ana) {
     triangle(landPx, landPy - 26, landPx, landPy - 14, landPx + 16, landPy - 20);
     ellipse(landPx, landPy, 8, 8);
 
-    // Kotak badge di atas bendera (py - 52) agar bebas dari panel bawah
+    // Kotak badge X_maks di atas bendera (py - 52) bebas dari panel bawah
     let badgeW = 96;
     let badgeH = 20;
     let badgeX = constrain(landPx, badgeW / 2 + 15, width - badgeW / 2 - 15);
@@ -1970,11 +1964,11 @@ function drawMarkers(ana) {
     textSize(9.5);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Xₘₐₖₛ Burung: ' + birdLandX.toFixed(1) + 'm', badgeX, badgeY + badgeH / 2);
+    text('Xmaks: ' + firstParabolaXmax.toFixed(1) + 'm', badgeX, badgeY + badgeH / 2);
     textStyle(NORMAL);
   }
 
-  // 3. Penanda Pendaratan Akhir Babi
+  // 3. Penanda Pendaratan Babi Pasca-Tumbukan
   if (collisionData && pig.landX > 1.0 && (pig.landed || simState === 'LANDED')) {
     let pigLandPx = ORIGIN_X + pig.landX * meterToPixel;
     let pigLandPy = GROUND_Y;
@@ -2007,7 +2001,7 @@ function drawMarkers(ana) {
     textSize(9.5);
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
-    text('Xₘₐₖₛ Babi: ' + pig.landX.toFixed(1) + 'm', bBadgeX, bBadgeY + bBadgeH / 2);
+    text('X Babi: ' + pig.landX.toFixed(1) + 'm', bBadgeX, bBadgeY + bBadgeH / 2);
     textStyle(NORMAL);
   }
 
@@ -2300,7 +2294,7 @@ function drawTelemetryOverlay(ana) {
   textSize(11);
   textStyle(BOLD);
   textAlign(LEFT, CENTER);
-  text('📊 TELEMETRI FISIKA', boxX + 12, boxY + 14);
+  text('TELEMETRI FISIKA', boxX + 12, boxY + 14);
 
   let statusText = (simState === 'FLYING') ? (proj.bounceCount > 0 ? 'MEMANTUL' : 'MELAYANG') : (simState === 'LANDED' ? 'MENDARAT' : 'SIAP TEMBAK');
   let statusBg = (simState === 'FLYING') ? '#4caf50' : (simState === 'LANDED' ? '#e53935' : '#2196f3');
@@ -2319,17 +2313,16 @@ function drawTelemetryOverlay(ana) {
   drawWhiteDataRow('Waktu Tempuh (t)', simTime.toFixed(2) + ' s', '#1e293b', boxX + 12, sy);
   drawWhiteDataRow('Posisi Jarak (x)', proj.x.toFixed(2) + ' m', '#1e88e5', boxX + 12, sy + lh);
   drawWhiteDataRow('Posisi Tinggi (y)', Math.max(0, proj.y).toFixed(2) + ' m', '#43a047', boxX + 12, sy + lh * 2);
-  drawWhiteDataRow('Kecepatan (vₓ)', proj.vx.toFixed(2) + ' m/s', '#1e88e5', boxX + 12, sy + lh * 3);
-  drawWhiteDataRow('Kecepatan (vᵧ)', proj.vy.toFixed(2) + ' m/s', '#43a047', boxX + 12, sy + lh * 4);
+  drawWhiteDataRow('Kecepatan (vx)', proj.vx.toFixed(2) + ' m/s', '#1e88e5', boxX + 12, sy + lh * 3);
+  drawWhiteDataRow('Kecepatan (vy)', proj.vy.toFixed(2) + ' m/s', '#43a047', boxX + 12, sy + lh * 4);
   drawWhiteDataRow('Resultan Laju (v)', proj.v.toFixed(2) + ' m/s', '#f57c00', boxX + 12, sy + lh * 5);
 
   stroke(226, 232, 240);
   strokeWeight(1);
   line(boxX + 10, sy + lh * 6 - 2, boxX + boxW - 10, sy + lh * 6 - 2);
 
-  drawWhiteDataRow('Tinggi Maks (Hₘₐₖₛ)', ana.Hmax.toFixed(2) + ' m', '#ff9800', boxX + 12, sy + lh * 6 + 7);
-  let birdLandX = (proj.landed && proj.landX > 0) ? proj.landX : ana.Xmax;
-  drawWhiteDataRow('Jarak Burung (Xₘₐₖₛ)', birdLandX.toFixed(2) + ' m', '#e53935', boxX + 12, sy + lh * 7 + 7);
+  drawWhiteDataRow('Tinggi Maks (Hmaks)', firstParabolaHmax.toFixed(2) + ' m', '#ff9800', boxX + 12, sy + lh * 6 + 7);
+  drawWhiteDataRow('Jangkauan Pertama (Xmaks)', firstParabolaXmax.toFixed(2) + ' m', '#e53935', boxX + 12, sy + lh * 7 + 7);
 
   if (collisionData) {
     stroke(226, 232, 240);
@@ -2379,7 +2372,7 @@ function drawChallengeBanner() {
   textSize(11.5);
   textStyle(BOLD);
   textAlign(LEFT, TOP);
-  text('🎯 MISI TANTANGAN SASARAN', banX + 14, banY + 10);
+  text('MISI TANTANGAN SASARAN', banX + 14, banY + 10);
 
   let boxesDestroyed = boxes.filter(b => b.isDestroyed).length;
   fill(30, 41, 59);
@@ -2409,7 +2402,7 @@ function drawControlInterface() {
   fill(100, 116, 139);
   textSize(9.5);
   textStyle(NORMAL);
-  text('💡 Tips: Tarik burung/ketapel langsung untuk membidik 360° & laju awal, lalu lepaskan untuk menembak!', 245, 517);
+  text('💡 Tips: Tarik laras meriam ke depan atau ke belakang untuk membidik & menentukan laju awal, lalu lepaskan untuk menembak!', 245, 517);
 
   for (let key in sliders) {
     sliders[key].draw();
@@ -2546,7 +2539,7 @@ class CartoonButton {
 }
 
 // =========================================================================================
-// BAGIAN 19: PENANGANAN INTERAKSI MOUSE (ANGRY BIRDS SLINGSHOT DRAG & 360° AIM)
+// BAGIAN 19: PENANGANAN INTERAKSI MOUSE (MERIAM DRAG DEPAN / BELAKANG & 360°)
 // =========================================================================================
 function updateMouseCursor(cannonY) {
   let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
@@ -2605,12 +2598,12 @@ function mousePressed() {
     }
   }
 
-  // 4. Interaksi Ketapel Angry Birds (Drag untuk Sudut 360° & Kecepatan v0)
+  // 4. Interaksi Tarik Meriam (Drag Depan atau Belakang)
   if (simState === 'IDLE') {
     let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
     if (dCannon < 85) {
       isAimingCannon = true;
-      updateSlingshotFromMouse(cannonY);
+      updateCannonDragFromMouse(cannonY);
       return;
     }
 
@@ -2636,7 +2629,7 @@ function mouseDragged() {
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
   if (isAimingCannon && simState === 'IDLE') {
-    updateSlingshotFromMouse(cannonY);
+    updateCannonDragFromMouse(cannonY);
     return;
   }
 
@@ -2659,8 +2652,9 @@ function mouseReleased() {
   if (isAimingCannon && simState === 'IDLE') {
     let d = dist(mouseX, mouseY, ORIGIN_X, cannonY);
     isAimingCannon = false;
+    cannonRecoilOffset = 0;
 
-    // JIKA TARIKAN CUKUP BESAR (> 18px), LEPASKAN TEMBAKAN (MEKANIKA ANGRY BIRDS!)
+    // Jika tarikan cukup besar (> 18px), lepaskan tembakan!
     if (d > 18) {
       fireProjectile();
     }
@@ -2673,20 +2667,36 @@ function mouseReleased() {
   }
 }
 
-function updateSlingshotFromMouse(cannonY) {
-  // Vektor tarikan ketapel: Dari mouse ke poros peluncur
-  let aimDx = ORIGIN_X - mouseX;
-  let aimDy = cannonY - mouseY;
+function updateCannonDragFromMouse(cannonY) {
+  let dx = mouseX - ORIGIN_X;
+  let dy = mouseY - cannonY;
+  let d = dist(mouseX, mouseY, ORIGIN_X, cannonY);
 
-  // Sudut tembakan 360 derajat (berlawanan dengan arah tarikan ketapel)
+  // Aturan Tarikan Sesuai Permintaan:
+  // - Jika ditarik ke belakang (dx < 0, mouse di sebelah kiri meriam):
+  //   meriam tetap menembak ke depan (lawan arahnya: aimDx = -dx, aimDy = -dy)
+  // - Jika ditarik ke depan (dx >= 0, mouse di sebelah kanan meriam):
+  //   meriam menembak searah tarikan (aimDx = dx, aimDy = -dy)
+  let aimDx, aimDy;
+  if (dx < 0) {
+    aimDx = -dx;
+    aimDy = -dy;
+    // Efek visual kompresi per laras meriam mundur
+    cannonRecoilOffset = -map(constrain(d, 10, 130), 10, 130, 0, 14);
+  } else {
+    aimDx = dx;
+    aimDy = -dy;
+    cannonRecoilOffset = map(constrain(d, 10, 130), 10, 130, 0, 6);
+  }
+
+  // Hitung sudut tembak 360 derajat
   let deg = degrees(Math.atan2(aimDy, aimDx));
   if (deg < 0) deg += 360;
   deg = Math.round(deg);
   angleDeg = deg;
   sliders.angle.value = deg;
 
-  // Jarak tarikan menentukan kecepatan awal v0 (seperti game Angry Birds!)
-  let d = dist(mouseX, mouseY, ORIGIN_X, cannonY);
+  // Jarak tarikan menentukan kecepatan awal v0 (batas 10 - 50 m/s)
   let dClamped = constrain(d, 10, 130);
   let speed = Math.round(map(dClamped, 10, 130, sliders.v0.min, sliders.v0.max));
   v0 = speed;

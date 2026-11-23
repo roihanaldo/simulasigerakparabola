@@ -3,9 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulasi Fisika Gerak Parabola - Edisi Angry Birds</title>
-  <!-- Library p5.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <title>Simulasi Fisika Gerak Parabola & Uji Tantangan Sasaran</title>
+  <!-- Library p5.js Lokal (Offline Cepat) dengan Fallback CDN -->
+  <script src="p5.min.js"></script>
+  <script>
+    if (typeof p5 === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"><\/script>');
+    }
+  </script>
   <style>
     * {
       margin: 0;
@@ -19,12 +24,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       min-height: 100vh;
-      padding: 16px;
+      padding: 16px 16px 28px 16px;
     }
     .header-title {
-      font-size: 20px;
+      font-size: 21px;
       font-weight: 800;
       color: #0369a1;
       margin-bottom: 12px;
@@ -37,11 +42,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       box-shadow: 0 15px 35px rgba(2, 132, 199, 0.25), 0 5px 15px rgba(0, 0, 0, 0.08);
       border-radius: 18px;
       overflow: hidden;
       background: #ffffff;
       border: 3px solid #7dd3fc;
+      min-width: 1040px;
+      min-height: 665px;
     }
     canvas {
       display: block;
@@ -52,12 +60,12 @@
       text-align: center;
       max-width: 1040px;
       line-height: 1.6;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.7);
+      padding: 12px 18px;
+      background: rgba(255, 255, 255, 0.85);
       border-radius: 12px;
-      margin-top: 12px;
+      margin-top: 14px;
       border: 1px solid rgba(255, 255, 255, 0.9);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
     .footer-notes strong {
       color: #0284c7;
@@ -67,20 +75,20 @@
 <body>
 
   <div class="header-title">
-    🎯 Petualangan Fisika: Simulasi Gerak Parabola & Uji Tantangan Sasaran
+    Simulasi Fisika Gerak Parabola & Uji Tantangan Sasaran
   </div>
 
-  <div class="container">
+  <div class="container" id="sim-container">
     <!-- Skrip p5.js Gerak Parabola Edisi Angry Birds -->
     <script src="sketch.js"></script>
   </div>
 
   <div class="footer-notes">
-    💡 <strong>Panduan Interaktif:</strong> 
-    (1) <strong>Tarik Burung pada Ketapel</strong> untuk mengatur laju awal (v₀) dan sudut tembak bebas 360°, lalu lepaskan untuk meluncurkan! 
+    <strong>Panduan Interaktif:</strong> 
+    (1) <strong>Tarik Laras Meriam / Burung</strong> maju (arah depan) atau mundur (meriam tetap menembak ke depan) untuk mengatur laju awal (v₀) dan sudut 360°, lalu lepaskan untuk meluncurkan! 
     (2) <strong>Tarik Platform</strong> untuk mengatur ketinggian awal (h₀). 
-    (3) <strong>Hancurkan Benteng Kotak Kayu & Babi</strong>: Rasakan efek ambang kerusakan (damage threshold) yang realistis! 
-    (4) <strong>Klik Setiap Titik Sampel Lingkaran</strong> pada lintasan untuk memeriksa telemetri kecepatan 2D dan hukum kekekalan momentum.
+    (3) <strong>Benteng Kotak Kayu Kokoh & Stabil</strong> sampai ditabrak langsung oleh proyektil, dilengkapi ambang batas kerusakan (damage threshold). 
+    (4) <strong>Klik Titik Sampel Lingkaran</strong> pada lintasan untuk memeriksa telemetri analitis, vektor kecepatan 2D, dan hukum kekekalan momentum.
   </div>
 
 </body>
