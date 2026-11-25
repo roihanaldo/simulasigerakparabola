@@ -2542,7 +2542,11 @@ class CartoonSlider {
     let handleX = this.x + progressW;
     let handleY = this.y + this.h / 2;
 
-    if (dist(mx, my, handleX, handleY) < 14 || (mx >= this.x && mx <= this.x + this.w && my >= this.y - 6 && my <= this.y + this.h + 6)) {
+    // Area sentuh diperbesar untuk jari (HP/tablet), tetap presisi untuk mouse
+    let isTouch = millis() - lastTouchTime < 300;
+    let handleR = isTouch ? 26 : 14;
+    let padY = isTouch ? 16 : 6;
+    if (dist(mx, my, handleX, handleY) < handleR || (mx >= this.x - (isTouch ? 10 : 0) && mx <= this.x + this.w + (isTouch ? 10 : 0) && my >= this.y - padY && my <= this.y + this.h + padY)) {
       this.isDragging = true;
       this.updateFromMouse(mx);
       return true;
@@ -2612,7 +2616,7 @@ class CartoonButton {
 function updateMouseCursor(cannonY) {
   let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
   let isNearCannon = (dCannon < 85 && simState === 'IDLE');
-  let isNearPlatform = (h0 > 0 && mouseX >= 25 && mouseX <= ORIGIN_X + 25 && mouseY >= cannonY - 15 && mouseY <= cannonY + 15 && simState === 'IDLE');
+  let isNearPlatform = (simState === 'IDLE' && isOnPlatformBody(cannonY));
 
   if (hoveredNode) {
     cursor('pointer');
@@ -2620,16 +2624,18 @@ function updateMouseCursor(cannonY) {
     cursor('crosshair');
   } else if (isDraggingPlatform) {
     cursor('ns-resize');
-  } else if (isNearCannon) {
-    cursor('grab');
   } else if (isNearPlatform) {
     cursor('ns-resize');
+  } else if (isNearCannon) {
+    cursor('grab');
   } else {
     cursor(ARROW);
   }
 }
 
-function mousePressed() {
+function mousePressed(e) {
+  // Abaikan event mouse tiruan yang dikirim browser setelah sentuhan (hindari klik ganda)
+  if (e && e.type === 'mousedown' && millis() - lastTouchTime < 800) return;
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
   // 1. Cek Klik Titik Sampel Burung & Tumbukan
@@ -2668,6 +2674,14 @@ function mousePressed() {
 
   // 4. Interaksi Tarik Meriam (Drag Depan atau Belakang)
   if (simState === 'IDLE') {
+    // Badan menara (di bawah meriam) diperiksa lebih dulu agar menara bisa diseret;
+    // sebelumnya area ini tertutup oleh radius tarik meriam sehingga meriam yang tertangkap.
+    if (isOnPlatformBody(cannonY)) {
+      isDraggingPlatform = true;
+      platformGrabOffset = (GROUND_Y - mouseY) / meterToPixel - h0;
+      return;
+    }
+
     let dCannon = dist(mouseX, mouseY, ORIGIN_X, cannonY);
     if (dCannon < 85) {
       isAimingCannon = true;
@@ -2677,6 +2691,7 @@ function mousePressed() {
 
     if (mouseX >= 25 && mouseX <= ORIGIN_X + 30 && Math.abs(mouseY - cannonY) < 20) {
       isDraggingPlatform = true;
+      platformGrabOffset = 0;
       updateHeightFromMouse();
       return;
     }
@@ -2714,7 +2729,8 @@ function mouseDragged() {
   }
 }
 
-function mouseReleased() {
+function mouseReleased(e) {
+  if (e && e.type === 'mouseup' && millis() - lastTouchTime < 800) return;
   let cannonY = GROUND_Y - h0 * meterToPixel;
 
   if (isAimingCannon && simState === 'IDLE') {
@@ -2771,10 +2787,58 @@ function updateCannonDragFromMouse(cannonY) {
   sliders.v0.value = speed;
 }
 
+let platformGrabOffset = 0;   // jarak (m) titik pegang di bawah puncak menara
+
+function isOnPlatformBody(cannonY) {
+  return h0 > 0 && Math.abs(mouseX - ORIGIN_X) <= 40 && mouseY >= cannonY + 22 && mouseY <= GROUND_Y;
+}
+
 function updateHeightFromMouse() {
   let pixelH = GROUND_Y - mouseY;
-  let mHeight = pixelH / meterToPixel;
+  let mHeight = pixelH / meterToPixel - platformGrabOffset;
   mHeight = constrain(Math.round(mHeight), 0, 50);
   sliders.h0.value = mHeight;
   h0 = mHeight;
+}
+
+
+// =========================================================================================
+// DUKUNGAN LAYAR SENTUH (HP / TABLET)
+// p5.js tidak memanggil mousePressed() saat jari pertama kali menyentuh layar, sehingga
+// slider, meriam, dan platform tidak bisa diseret. Fungsi di bawah meneruskan sentuhan
+// ke handler mouse yang sama, dan mencegah halaman ikut bergulir saat menyeret di kanvas.
+// =========================================================================================
+let lastTouchTime = -10000;
+
+function isCanvasTouch(e) {
+  return !!(e && e.target && e.target.tagName === 'CANVAS');
+}
+
+function isDraggingAnything() {
+  if (isAimingCannon || isDraggingPlatform) return true;
+  for (let key in sliders) {
+    if (sliders[key].isDragging) return true;
+  }
+  return false;
+}
+
+function touchStarted(e) {
+  if (!isCanvasTouch(e)) return true;   // sentuhan di luar kanvas: biarkan halaman bergulir
+  lastTouchTime = millis();
+  mousePressed();
+  return false;
+}
+
+function touchMoved(e) {
+  if (!isCanvasTouch(e) && !isDraggingAnything()) return true;
+  lastTouchTime = millis();
+  mouseDragged();
+  return false;
+}
+
+function touchEnded(e) {
+  if (!isCanvasTouch(e) && !isDraggingAnything()) return true;
+  lastTouchTime = millis();
+  mouseReleased();
+  return false;
 }
